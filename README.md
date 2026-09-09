@@ -2,11 +2,11 @@
 
 A personal, single-user agent that researches, verifies, and prepares — a human always approves before anything executes. See [CLAUDE.md](CLAUDE.md) for the full philosophy, build order, and standards this project is held to.
 
-This is **Phase 1: Foundation** — repo structure, auth, DB, and a real design-system frontend shell. No AI features live here yet; everything below is deterministic infrastructure.
+**Phase 1: Foundation** (auth, DB, design-system shell) and **Phase 2: Personal Profile Engine** (structured profile, evidence-backed skill history, preferences, pgvector/Voyage embeddings groundwork) are done. No research, matching, or Gmail features exist yet — those are Phases 3+.
 
 ## Stack
 
-- **Backend**: FastAPI (async), Pydantic v2, SQLAlchemy 2.0 (async) + Alembic, PostgreSQL + pgvector, Redis, structlog, JWT auth via OAuth2 password flow.
+- **Backend**: FastAPI (async), Pydantic v2, SQLAlchemy 2.0 (async) + Alembic, PostgreSQL + pgvector, Redis, structlog, JWT auth via OAuth2 password flow, Voyage AI for embeddings.
 - **Frontend**: React + TypeScript + Vite, Tailwind CSS v4, Radix primitives (shadcn-style components), TanStack Query, Zustand, Framer Motion, a Cmd/Ctrl+K command palette.
 - **Infra**: Docker Compose for local Postgres + Redis.
 
@@ -48,6 +48,8 @@ Settings always load `.env` from the repo root regardless of your working direct
 - Interactive docs: http://localhost:8000/docs
 - Health check (verifies live DB + Redis connectivity, not a guess): http://localhost:8000/health
 
+**Embeddings (optional):** the Profile Engine embeds bio/work-experience/skill-evidence text via Voyage AI for later semantic search (Phase 4). Set `VOYAGE_API_KEY` in `.env` (get one at https://dash.voyageai.com) to enable it — without it, profile CRUD still works fully, embeddings are just skipped with a logged warning rather than faked.
+
 Run tests:
 
 ```bash
@@ -86,10 +88,11 @@ npx playwright install
 npm run e2e
 ```
 
-## Verifying Phase 1 end-to-end
+## Verifying end-to-end
 
 1. `docker compose up -d`, confirm both services healthy.
 2. Backend running, `GET /health` returns `"status": "ok"` for both `database` and `redis`.
 3. Register the first user via `/docs`.
 4. Frontend running, log in with that user at http://localhost:5173/login.
 5. Dashboard loads your profile (fetched live from the backend), shows the command palette on Cmd/Ctrl+K, and the theme toggle switches light/dark without a flash.
+6. Go to **Profile**: fill in the overview form, add a work experience, add a skill and give it an evidence-backed assessment, set preferences. Everything persists to Postgres; a second assessment on the same skill adds to its history instead of overwriting the first.
