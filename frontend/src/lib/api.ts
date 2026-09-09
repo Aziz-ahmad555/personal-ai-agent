@@ -49,6 +49,10 @@ export interface TokenPair {
   token_type: string
 }
 
+function authHeaders(accessToken: string): HeadersInit {
+  return { Authorization: `Bearer ${accessToken}` }
+}
+
 export const authApi = {
   register(email: string, password: string) {
     return apiFetch<UserRead>('/auth/register', {
@@ -76,6 +80,214 @@ export const authApi = {
     return apiFetch<TokenPair>('/auth/refresh', {
       method: 'POST',
       body: JSON.stringify({ refresh_token: refreshToken }),
+    })
+  },
+}
+
+// --- Profile Engine ---
+
+export interface ProfileLink {
+  id: string
+  label: string
+  url: string
+}
+
+export interface Profile {
+  id: string
+  headline: string | null
+  summary: string | null
+  location: string | null
+  links: ProfileLink[]
+  created_at: string
+  updated_at: string
+}
+
+export interface ProfileUpdateInput {
+  headline?: string | null
+  summary?: string | null
+  location?: string | null
+}
+
+export interface WorkExperience {
+  id: string
+  company: string
+  title: string
+  location: string | null
+  start_date: string
+  end_date: string | null
+  description: string | null
+}
+
+export interface WorkExperienceInput {
+  company: string
+  title: string
+  location?: string | null
+  start_date: string
+  end_date?: string | null
+  description?: string | null
+}
+
+export interface Education {
+  id: string
+  institution: string
+  degree: string | null
+  field: string | null
+  start_date: string | null
+  end_date: string | null
+}
+
+export interface EducationInput {
+  institution: string
+  degree?: string | null
+  field?: string | null
+  start_date?: string | null
+  end_date?: string | null
+}
+
+export type SkillLevel = 'beginner' | 'intermediate' | 'advanced' | 'expert'
+
+export interface SkillVersion {
+  id: string
+  level: SkillLevel
+  evidence: string
+  evidence_url: string | null
+  work_experience_id: string | null
+  asserted_at: string
+}
+
+export interface Skill {
+  id: string
+  name: string
+  category: string | null
+  created_at: string
+  versions: SkillVersion[]
+}
+
+export interface SkillVersionInput {
+  level: SkillLevel
+  evidence: string
+  evidence_url?: string | null
+  work_experience_id?: string | null
+}
+
+export type RemotePreference = 'remote' | 'hybrid' | 'onsite' | 'no_preference'
+
+export interface Preferences {
+  job_types: string[]
+  remote_preference: RemotePreference
+  locations: string[]
+  salary_min: number | null
+  salary_max: number | null
+  industries_include: string[]
+  industries_exclude: string[]
+  deal_breakers: string | null
+  updated_at: string
+}
+
+export interface PreferencesInput {
+  job_types?: string[]
+  remote_preference?: RemotePreference
+  locations?: string[]
+  salary_min?: number | null
+  salary_max?: number | null
+  industries_include?: string[]
+  industries_exclude?: string[]
+  deal_breakers?: string | null
+}
+
+export const profileApi = {
+  get(token: string) {
+    return apiFetch<Profile>('/profile', { headers: authHeaders(token) })
+  },
+  update(token: string, input: ProfileUpdateInput) {
+    return apiFetch<Profile>('/profile', {
+      method: 'PUT',
+      headers: authHeaders(token),
+      body: JSON.stringify(input),
+    })
+  },
+  addLink(token: string, input: { label: string; url: string }) {
+    return apiFetch<ProfileLink>('/profile/links', {
+      method: 'POST',
+      headers: authHeaders(token),
+      body: JSON.stringify(input),
+    })
+  },
+  deleteLink(token: string, id: string) {
+    return apiFetch<void>(`/profile/links/${id}`, { method: 'DELETE', headers: authHeaders(token) })
+  },
+
+  listExperience(token: string) {
+    return apiFetch<WorkExperience[]>('/profile/experience', { headers: authHeaders(token) })
+  },
+  createExperience(token: string, input: WorkExperienceInput) {
+    return apiFetch<WorkExperience>('/profile/experience', {
+      method: 'POST',
+      headers: authHeaders(token),
+      body: JSON.stringify(input),
+    })
+  },
+  updateExperience(token: string, id: string, input: Partial<WorkExperienceInput>) {
+    return apiFetch<WorkExperience>(`/profile/experience/${id}`, {
+      method: 'PUT',
+      headers: authHeaders(token),
+      body: JSON.stringify(input),
+    })
+  },
+  deleteExperience(token: string, id: string) {
+    return apiFetch<void>(`/profile/experience/${id}`, { method: 'DELETE', headers: authHeaders(token) })
+  },
+
+  listEducation(token: string) {
+    return apiFetch<Education[]>('/profile/education', { headers: authHeaders(token) })
+  },
+  createEducation(token: string, input: EducationInput) {
+    return apiFetch<Education>('/profile/education', {
+      method: 'POST',
+      headers: authHeaders(token),
+      body: JSON.stringify(input),
+    })
+  },
+  updateEducation(token: string, id: string, input: Partial<EducationInput>) {
+    return apiFetch<Education>(`/profile/education/${id}`, {
+      method: 'PUT',
+      headers: authHeaders(token),
+      body: JSON.stringify(input),
+    })
+  },
+  deleteEducation(token: string, id: string) {
+    return apiFetch<void>(`/profile/education/${id}`, { method: 'DELETE', headers: authHeaders(token) })
+  },
+
+  listSkills(token: string) {
+    return apiFetch<Skill[]>('/profile/skills', { headers: authHeaders(token) })
+  },
+  createSkill(token: string, input: { name: string; category?: string | null }) {
+    return apiFetch<Skill>('/profile/skills', {
+      method: 'POST',
+      headers: authHeaders(token),
+      body: JSON.stringify(input),
+    })
+  },
+  deleteSkill(token: string, id: string) {
+    return apiFetch<void>(`/profile/skills/${id}`, { method: 'DELETE', headers: authHeaders(token) })
+  },
+  addSkillVersion(token: string, skillId: string, input: SkillVersionInput) {
+    return apiFetch<SkillVersion>(`/profile/skills/${skillId}/versions`, {
+      method: 'POST',
+      headers: authHeaders(token),
+      body: JSON.stringify(input),
+    })
+  },
+
+  getPreferences(token: string) {
+    return apiFetch<Preferences>('/profile/preferences', { headers: authHeaders(token) })
+  },
+  updatePreferences(token: string, input: PreferencesInput) {
+    return apiFetch<Preferences>('/profile/preferences', {
+      method: 'PUT',
+      headers: authHeaders(token),
+      body: JSON.stringify(input),
     })
   },
 }
