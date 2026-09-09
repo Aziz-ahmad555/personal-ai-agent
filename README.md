@@ -28,6 +28,8 @@ Verify both containers are healthy:
 docker compose ps
 ```
 
+**Note:** Postgres is mapped to host port **5433**, not the default 5432. If you have a native/standalone Postgres already running on this machine, it silently wins the 5432 binding on Windows (IPv4 vs IPv6 binding precedence) and `localhost:5432` connections will hit *that* server instead of the container — auth then fails with no trace in the container's logs. Using 5433 avoids the collision entirely. If 5433 is also taken on your machine, change `POSTGRES_PORT` in `.env` and `DATABASE_URL`'s port to match.
+
 ## 2. Backend
 
 ```bash
@@ -39,6 +41,8 @@ cp ../.env.example ../.env      # then fill in real secrets
 alembic upgrade head
 uvicorn app.main:app --reload
 ```
+
+Settings always load `.env` from the repo root regardless of your working directory, so run these commands from wherever's convenient — there's no ambiguity about which `.env` gets read.
 
 - API: http://localhost:8000
 - Interactive docs: http://localhost:8000/docs
