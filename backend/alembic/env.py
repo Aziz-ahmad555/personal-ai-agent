@@ -9,6 +9,16 @@ from alembic import context
 from app.config import get_settings
 from app.db.base import Base
 from app.db.models import User  # noqa: F401 — registers model metadata
+from app.profile.models import (  # noqa: F401 — registers model metadata
+    Education,
+    Preferences,
+    Profile,
+    ProfileEmbedding,
+    ProfileLink,
+    Skill,
+    SkillVersion,
+    WorkExperience,
+)
 
 config = context.config
 

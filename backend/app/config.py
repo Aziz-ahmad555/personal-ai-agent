@@ -4,7 +4,7 @@ from pathlib import Path
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-# Repo root, regardless of the process's working directory: backend/app/config.py -> backend/ -> root/
+# Repo root, regardless of cwd: backend/app/config.py -> backend/ -> root/
 _REPO_ROOT_ENV_FILE = Path(__file__).resolve().parent.parent.parent / ".env"
 
 
@@ -22,6 +22,10 @@ class Settings(BaseSettings):
     refresh_token_expire_days: int = 14
 
     cors_origins: str = "http://localhost:5173"
+
+    voyage_api_key: str | None = None
+    voyage_model: str = "voyage-3-lite"
+    voyage_embedding_dimensions: int = 512
 
     @property
     def cors_origin_list(self) -> list[str]:

@@ -61,9 +61,7 @@ async def test_me_returns_current_user(client: AsyncClient) -> None:
     )
     access_token = login.json()["access_token"]
 
-    response = await client.get(
-        "/auth/me", headers={"Authorization": f"Bearer {access_token}"}
-    )
+    response = await client.get("/auth/me", headers={"Authorization": f"Bearer {access_token}"})
 
     assert response.status_code == 200
     assert response.json()["email"] == REGISTER_PAYLOAD["email"]

@@ -45,3 +45,29 @@ async def _setup_db() -> AsyncGenerator[None, None]:
 async def client() -> AsyncGenerator[AsyncClient, None]:
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         yield ac
+
+
+@pytest.fixture(autouse=True)
+def _fake_embeddings(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Tests never call the real Voyage API. By default embeddings "succeed" with a
+    deterministic fake vector, so the storage path is exercised; test_embeddings.py
+    overrides this to simulate the no-API-key skip path explicitly."""
+
+    async def _fake_embed_texts(texts: list[str]) -> list[list[float]] | None:
+        return [[0.0] * 512 for _ in texts]
+
+    monkeypatch.setattr("app.profile.embeddings.embed_texts", _fake_embed_texts)
+
+
+@pytest.fixture
+def session_factory() -> async_sessionmaker[AsyncSession]:
+    return TestSessionFactory
+
+
+@pytest.fixture
+async def auth_headers(client: AsyncClient) -> dict[str, str]:
+    email = "profile-owner@example.com"
+    password = "correct-horse-battery"
+    await client.post("/auth/register", json={"email": email, "password": password})
+    login = await client.post("/auth/login", data={"username": email, "password": password})
+    return {"Authorization": f"Bearer {login.json()['access_token']}"}
