@@ -16,6 +16,7 @@ from app.career.models import (  # noqa: F401 — registers model metadata
 from app.config import get_settings
 from app.db.base import Base
 from app.db.models import User  # noqa: F401 — registers model metadata
+from app.github.models import GithubConnection  # noqa: F401 — registers model metadata
 from app.gmail.models import (  # noqa: F401 — registers model metadata
     EmailMessage,
     GmailConnection,

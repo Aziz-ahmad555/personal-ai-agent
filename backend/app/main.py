@@ -15,6 +15,8 @@ from app.career.router import router as career_router
 from app.config import get_settings
 from app.core.health import router as health_router
 from app.gmail.router import router as gmail_router
+from app.github.router import router as github_router
+from app.integrations.router import router as integrations_router
 from app.logging import configure_logging, get_logger
 from app.profile.router import router as profile_router
 from app.research.router import router as research_router
@@ -61,6 +63,8 @@ def create_app() -> FastAPI:
     app.include_router(research_router)
     app.include_router(search_router)
     app.include_router(gmail_router)
+    app.include_router(github_router)
+    app.include_router(integrations_router)
     app.include_router(career_router)
     app.include_router(applications_router)
     app.include_router(resume_router)

@@ -56,6 +56,14 @@ class Settings(BaseSettings):
     # python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
     token_encryption_key: str | None = None
 
+    # GitHub App (user authorization flow). Read-only by construction: the app is registered
+    # with no permissions beyond the mandatory metadata:read, and the callback refuses any
+    # app that has write permissions. See README "GitHub integration".
+    github_client_id: str | None = None
+    github_client_secret: str | None = None
+    github_redirect_uri: str = "http://localhost:8000/github/oauth/callback"
+    github_frontend_return_url: str = "http://localhost:5173/github"
+
     gmail_sync_window_days: int = 180
     gmail_fetch_concurrency: int = 4
     gmail_fetch_timeout_seconds: float = 15.0

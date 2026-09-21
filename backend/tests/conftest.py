@@ -6,6 +6,8 @@ os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///:memory:")
 os.environ.setdefault("TOKEN_ENCRYPTION_KEY", "Emb1Qfnswo7SlMmYcYu1OjTpVMmleBlkM_lpO-nh2Eo=")
 os.environ.setdefault("GOOGLE_CLIENT_ID", "test-client-id.apps.googleusercontent.com")
 os.environ.setdefault("GOOGLE_CLIENT_SECRET", "test-client-secret")
+os.environ.setdefault("GITHUB_CLIENT_ID", "test-github-client-id")
+os.environ.setdefault("GITHUB_CLIENT_SECRET", "test-github-client-secret")
 
 import pytest  # noqa: E402
 from httpx import ASGITransport, AsyncClient  # noqa: E402
