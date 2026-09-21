@@ -12,12 +12,20 @@ from app.career.discovery import (
     capture_job_from_url,
     poll_company_feed,
 )
-from app.career.models import EmployerVerification, JobBoardFeed, JobFraudAssessment, JobPosting
+from app.career.match_service import load_profile_facts, run_match, start_match
+from app.career.models import (
+    EmployerVerification,
+    JobBoardFeed,
+    JobFraudAssessment,
+    JobMatch,
+    JobPosting,
+)
 from app.career.schemas import (
     EmployerVerificationRead,
     JobBoardFeedCreate,
     JobBoardFeedRead,
     JobFraudAssessmentRead,
+    JobMatchRead,
     JobPostingCreateFromText,
     JobPostingCreateFromUrl,
     JobPostingRead,
@@ -35,7 +43,9 @@ router = APIRouter(prefix="/career/jobs", tags=["career"])
 _NOT_FOUND = HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
 
 
-async def _build_job_read(db: AsyncSession, job: JobPosting) -> JobPostingRead:
+async def _build_job_read(
+    db: AsyncSession, job: JobPosting, *, profile_stamp: str | None = None
+) -> JobPostingRead:
     """Nested employer_verification/fraud_assessment aren't SQLAlchemy relationships on
     JobPosting (EmployerVerification is keyed per-employer, shared across postings, not a
     1:1 FK) — fetched separately and attached, the same manual-assembly approach
@@ -55,9 +65,21 @@ async def _build_job_read(db: AsyncSession, job: JobPosting) -> JobPostingRead:
             )
         ).scalar_one_or_none()
 
+    match = (
+        await db.execute(select(JobMatch).where(JobMatch.job_posting_id == job.id))
+    ).scalar_one_or_none()
+    match_read = None
+    if match is not None:
+        if profile_stamp is None:
+            _, profile_stamp = await load_profile_facts(db, job.user_id)
+        match_read = JobMatchRead.model_validate(match).model_copy(
+            update={"is_stale": match.profile_stamp != profile_stamp}
+        )
+
     data = JobPostingRead.model_validate(job)
     return data.model_copy(
         update={
+            "match": match_read,
             "fraud_assessment": (
                 JobFraudAssessmentRead.model_validate(fraud) if fraud is not None else None
             ),
@@ -111,7 +133,9 @@ async def list_jobs(
         .order_by(JobPosting.discovered_at.desc())
     )
     jobs = list(result.scalars().all())
-    return [await _build_job_read(db, job) for job in jobs]
+    # One profile read for the whole list, not one per posting.
+    _, profile_stamp = await load_profile_facts(db, user.id)
+    return [await _build_job_read(db, job, profile_stamp=profile_stamp) for job in jobs]
 
 
 async def _get_owned_job(db: AsyncSession, job_id: uuid.UUID, user_id: uuid.UUID) -> JobPosting:
@@ -236,3 +260,25 @@ async def verify_job(
     await _get_owned_job(db, job_id, user.id)  # ownership check
     background_tasks.add_task(_verify_job_in_background, job_id, user.id)
     return {"status": "verification_started"}
+
+
+async def _match_job_in_background(job_id: uuid.UUID, user_id: uuid.UUID) -> None:
+    async with db_base.async_session_factory() as db:
+        await run_match(db, job_id, user_id=user_id)
+        await db.commit()
+
+
+@router.post("/{job_id}/match", status_code=status.HTTP_202_ACCEPTED)
+async def match_job(
+    job_id: uuid.UUID,
+    background_tasks: BackgroundTasks,
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> dict[str, str]:
+    job = await _get_owned_job(db, job_id, user.id)
+    # Create/reset the row now so the client's very next fetch sees "running" rather than a
+    # missing match; the background task fills it in.
+    await start_match(db, job)
+    await db.commit()
+    background_tasks.add_task(_match_job_in_background, job_id, user.id)
+    return {"status": "match_started"}

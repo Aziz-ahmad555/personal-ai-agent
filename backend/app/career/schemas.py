@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, model_validator
 
@@ -9,6 +9,9 @@ RemoteType = Literal["remote", "hybrid", "onsite", "unknown"]
 Board = Literal["greenhouse", "lever", "ashby", "usajobs"]
 EmployerVerificationStatus = Literal["verified", "unconfirmed", "suspicious"]
 FraudRiskLevel = Literal["low", "medium", "high"]
+MatchStatus = Literal["running", "completed", "failed"]
+ComponentStatus = Literal["assessed", "not_assessed"]
+DealBreakerCheck = Literal["none_set", "checked", "unavailable"]
 
 
 class FraudSignalRead(BaseModel):
@@ -35,6 +38,44 @@ class JobFraudAssessmentRead(BaseModel):
     risk_score: int
     signals: list[FraudSignalRead]
     assessed_at: datetime
+
+
+class MatchComponentRead(BaseModel):
+    key: str
+    label: str
+    weight: int
+    status: ComponentStatus
+    fraction: float | None
+    points: float | None
+    summary: str
+    reason: str | None
+    details: list[dict[str, Any]]
+
+
+class DealBreakerHitRead(BaseModel):
+    deal_breaker: str
+    quote: str
+
+
+class JobMatchRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    status: MatchStatus
+    error: str | None
+    # Null (never 0) when nothing could be assessed.
+    score_percent: int | None
+    # Of the 100 points, how many were actually measurable — the basis of low_confidence.
+    assessed_weight: int
+    low_confidence: bool
+    components: list[MatchComponentRead]
+    uncertainties: list[str]
+    deal_breaker_check: DealBreakerCheck
+    deal_breaker_hits: list[DealBreakerHitRead]
+    # True when the profile changed after this was computed. Set by the router (it needs the
+    # current profile), not read from the row.
+    is_stale: bool = False
+    computed_at: datetime
 
 
 class JobPostingCreateFromUrl(BaseModel):
@@ -68,6 +109,7 @@ class JobPostingRead(BaseModel):
     # per-posting one.
     employer_verification: EmployerVerificationRead | None = None
     fraud_assessment: JobFraudAssessmentRead | None = None
+    match: JobMatchRead | None = None
 
 
 class JobBoardFeedCreate(BaseModel):

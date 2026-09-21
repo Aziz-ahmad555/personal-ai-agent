@@ -188,3 +188,50 @@ class JobFraudAssessment(Base):
     assessed_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+
+MATCH_STATUSES = ("running", "completed", "failed")
+
+
+class JobMatch(Base):
+    """One per JobPosting: how well the posting fits the user's profile, as a weighted,
+    fully-decomposed score (see app.career.matching). Every component carries its evidence,
+    and a component that couldn't be judged (the posting or the profile doesn't say) is
+    recorded as "not_assessed" and left out of the score's denominator — never guessed.
+    `assessed_weight` is how much of the 100 points was actually measurable, which is what
+    the UI's low-confidence warning keys off."""
+
+    __tablename__ = "job_matches"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    job_posting_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("job_postings.id", ondelete="CASCADE"), unique=True, nullable=False
+    )
+    status: Mapped[str] = mapped_column(String(20), default="running", nullable=False)
+    error: Mapped[str | None] = mapped_column(Text)
+
+    # Null when nothing at all could be assessed — an honest "I can't tell", not a 0.
+    score_percent: Mapped[int | None] = mapped_column(Integer)
+    assessed_weight: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    low_confidence: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    # Per-component breakdown: [{key, label, weight, status, fraction, points, summary,
+    # reason, details}] — see app.career.matching.ComponentResult.
+    components: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list, nullable=False)
+    uncertainties: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    # The verified requirements the score was computed from (quotes confirmed to appear in
+    # the posting), kept so the breakdown is auditable after the fact.
+    requirements: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+
+    # "none_set" (no deal-breakers in preferences), "checked", or "unavailable" (the check
+    # itself failed — the user must not read an empty hit list as "clear" in that case).
+    deal_breaker_check: Mapped[str] = mapped_column(String(20), default="none_set", nullable=False)
+    deal_breaker_hits: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSON, default=list, nullable=False
+    )
+
+    # Hash of the profile facts this score was computed from — a differing current hash
+    # means the profile changed since, i.e. the score is stale.
+    profile_stamp: Mapped[str | None] = mapped_column(String(64))
+    computed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
