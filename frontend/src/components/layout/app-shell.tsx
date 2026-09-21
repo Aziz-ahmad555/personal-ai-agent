@@ -30,13 +30,13 @@ export function AppShell() {
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground">
       <CommandPalette />
-      <header className="flex items-center justify-between border-b border-border px-6 py-3">
-        <div className="flex items-center gap-6">
-          <div className="flex items-center gap-2 font-semibold">
+      <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-border px-4 py-3 sm:px-6">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-6 gap-y-2">
+          <div className="flex items-center gap-2 whitespace-nowrap font-semibold">
             <span className="h-2 w-2 rounded-full bg-primary" />
             Personal AI Agent
           </div>
-          <nav className="flex items-center gap-1">
+          <nav className="flex flex-wrap items-center gap-1">
             {NAV_ITEMS.map((item) => (
               <NavLink
                 key={item.to}
@@ -61,7 +61,7 @@ export function AppShell() {
           <ThemeToggle />
           {user && (
             <>
-              <span className="text-sm text-muted-foreground">{user.email}</span>
+              <span className="hidden text-sm text-muted-foreground md:inline">{user.email}</span>
               <Button variant="ghost" size="icon" aria-label="Log out" onClick={handleLogout}>
                 <LogOut className="h-4 w-4" />
               </Button>
@@ -74,7 +74,7 @@ export function AppShell() {
         initial={{ opacity: 0, y: 4 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.15 }}
-        className="flex-1 p-6"
+        className="min-w-0 flex-1 p-4 sm:p-6"
       >
         <Outlet />
       </motion.main>
