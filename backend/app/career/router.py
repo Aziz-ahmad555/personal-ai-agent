@@ -12,7 +12,13 @@ from app.career.discovery import (
     capture_job_from_url,
     poll_company_feed,
 )
-from app.career.match_service import load_profile_facts, run_match, start_match
+from app.career.match_service import (
+    STALLED_MESSAGE,
+    is_stalled,
+    load_profile_facts,
+    run_match,
+    start_match,
+)
 from app.career.models import (
     EmployerVerification,
     JobBoardFeed,
@@ -72,9 +78,11 @@ async def _build_job_read(
     if match is not None:
         if profile_stamp is None:
             _, profile_stamp = await load_profile_facts(db, job.user_id)
-        match_read = JobMatchRead.model_validate(match).model_copy(
-            update={"is_stale": match.profile_stamp != profile_stamp}
-        )
+        update: dict[str, object] = {"is_stale": match.profile_stamp != profile_stamp}
+        if is_stalled(match):
+            # Report an orphaned run as failed so the UI stops polling and offers a retry.
+            update.update(status="failed", error=STALLED_MESSAGE)
+        match_read = JobMatchRead.model_validate(match).model_copy(update=update)
 
     data = JobPostingRead.model_validate(job)
     return data.model_copy(

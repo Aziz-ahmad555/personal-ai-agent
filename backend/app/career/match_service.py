@@ -10,7 +10,7 @@ import hashlib
 import json
 import math
 import uuid
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -47,6 +47,16 @@ logger = get_logger(__name__)
 # an uncalibrated starting default, not a tuned value — worth revisiting against real
 # postings before trusting it.
 FUZZY_SIMILARITY_THRESHOLD = 0.8
+
+# Deliberately generous: a healthy run makes up to two LLM calls, each of which may retry
+# with backoff under provider overload (observed: ~3 minutes end to end). Past this, the
+# background task is presumed dead.
+MATCH_TIMEOUT = timedelta(minutes=10)
+
+STALLED_MESSAGE = (
+    "This match didn't finish — the server was probably restarted while it was running. "
+    "Try again."
+)
 
 
 class MatchError(RuntimeError):
@@ -182,14 +192,26 @@ async def start_match(db: AsyncSession, job: JobPosting) -> JobMatch:
     match = (
         await db.execute(select(JobMatch).where(JobMatch.job_posting_id == job.id))
     ).scalar_one_or_none()
+    now = datetime.now(UTC)
     if match is None:
-        match = JobMatch(job_posting_id=job.id, status="running")
+        match = JobMatch(job_posting_id=job.id, status="running", started_at=now)
         db.add(match)
     else:
         match.status = "running"
         match.error = None
+        match.started_at = now
     await db.flush()
     return match
+
+
+def is_stalled(match: JobMatch, *, now: datetime | None = None) -> bool:
+    """A match still "running" long after it started never finished: the background task
+    lives inside the server process, so a restart (or crash) silently kills it and leaves the
+    row behind. Detected on read rather than by a sweeper, so nothing has to write just to
+    look at a job."""
+    if match.status != "running":
+        return False
+    return (now or datetime.now(UTC)) - _as_utc(match.started_at) > MATCH_TIMEOUT
 
 
 async def run_match(db: AsyncSession, job_posting_id: uuid.UUID, *, user_id: uuid.UUID) -> None:

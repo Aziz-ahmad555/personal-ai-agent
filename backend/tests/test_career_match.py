@@ -2,6 +2,9 @@
 the orchestration: verified requirements -> profile facts -> score -> stored breakdown, plus
 staleness detection, failure states, and the deal-breaker check."""
 
+import uuid
+from datetime import UTC, datetime, timedelta
+
 import pytest
 from httpx import AsyncClient
 from sqlalchemy import select
@@ -9,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.auth.security import hash_password
 from app.career import match_service
-from app.career.models import JobPosting
+from app.career.models import JobMatch, JobPosting
 from app.db.models import User
 from app.research.llm import LLMError
 
@@ -347,3 +350,64 @@ async def test_cannot_match_another_users_job(
     response = await client.post(f"/career/jobs/{job_id}/match", headers=auth_headers)
 
     assert response.status_code == 404
+
+
+async def _seed_running_match(
+    session_factory: async_sessionmaker[AsyncSession], job_id: str, *, age: timedelta
+) -> None:
+    async with session_factory() as db:
+        db.add(
+            JobMatch(
+                job_posting_id=uuid.UUID(job_id),
+                status="running",
+                started_at=datetime.now(UTC) - age,
+            )
+        )
+        await db.commit()
+
+
+async def test_orphaned_running_match_is_reported_failed_not_running_forever(
+    client: AsyncClient,
+    auth_headers: dict[str, str],
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    job_id = await _make_job(session_factory)
+    await _seed_running_match(session_factory, job_id, age=timedelta(minutes=20))
+
+    job = await client.get(f"/career/jobs/{job_id}", headers=auth_headers)
+
+    match = job.json()["match"]
+    assert match["status"] == "failed"
+    assert "didn't finish" in match["error"]
+    listed = await client.get("/career/jobs", headers=auth_headers)
+    assert listed.json()[0]["match"]["status"] == "failed"
+
+
+async def test_recently_started_match_still_reads_as_running(
+    client: AsyncClient,
+    auth_headers: dict[str, str],
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    job_id = await _make_job(session_factory)
+    # Long enough to be slow (Gemini retries), well short of the timeout.
+    await _seed_running_match(session_factory, job_id, age=timedelta(minutes=4))
+
+    job = await client.get(f"/career/jobs/{job_id}", headers=auth_headers)
+
+    assert job.json()["match"]["status"] == "running"
+
+
+async def test_rematching_a_stalled_match_recovers(
+    client: AsyncClient,
+    auth_headers: dict[str, str],
+    session_factory: async_sessionmaker[AsyncSession],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _use_llm(monkeypatch, _FakeLLM())
+    await _add_skill(client, auth_headers, "Python")
+    job_id = await _make_job(session_factory)
+    await _seed_running_match(session_factory, job_id, age=timedelta(minutes=20))
+
+    match = await _match(client, auth_headers, job_id)
+
+    assert match["status"] == "completed"

@@ -209,6 +209,12 @@ class JobMatch(Base):
     )
     status: Mapped[str] = mapped_column(String(20), default="running", nullable=False)
     error: Mapped[str | None] = mapped_column(Text)
+    # When the current run began (reset on every re-match). A background task dies with the
+    # server process, so a "running" row that outlives MATCH_TIMEOUT is orphaned — see
+    # app.career.match_service.is_stalled.
+    started_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
 
     # Null when nothing at all could be assessed — an honest "I can't tell", not a 0.
     score_percent: Mapped[int | None] = mapped_column(Integer)
