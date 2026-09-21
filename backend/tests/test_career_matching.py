@@ -305,3 +305,33 @@ def test_dropped_unverified_requirements_are_surfaced() -> None:
     result = score_match(requirements, ProfileFacts(skills=(_skill("Python"),)), JobFacts())
 
     assert any("2 extracted requirement(s) were discarded" in u for u in result.uncertainties)
+
+
+def test_city_inside_a_preferred_country_is_not_penalized_as_a_location_mismatch() -> None:
+    # "Lahore" is in "Pakistan", but string matching can't know that — so the location
+    # check must be left out (and disclosed), not scored as a miss.
+    profile = ProfileFacts(
+        preferences=PreferenceFacts(remote_preference="hybrid", locations=("Pakistan", "Remote"))
+    )
+
+    result = score_match(
+        JobRequirements(), profile, JobFacts(remote_type="hybrid", location="Lahore")
+    )
+    component = _component(result, "work_mode_location")
+
+    assert component.status == "assessed"
+    assert component.fraction == 1.0  # only the work-mode check (hybrid == hybrid) counts
+    location = next(d for d in component.details if d["check"] == "location")
+    assert location["matched"] is None
+    assert "isn't counted against you" in location["note"]
+    assert any("Lahore" in u and "may still be inside one" in u for u in result.uncertainties)
+
+
+def test_unmatched_location_alone_leaves_the_component_not_assessed() -> None:
+    profile = ProfileFacts(preferences=PreferenceFacts(locations=("Pakistan",)))
+
+    job = JobFacts(remote_type="onsite", location="Lahore")
+    result = score_match(JobRequirements(), profile, job)
+
+    assert _component(result, "work_mode_location").status == "not_assessed"
+    assert any("Lahore" in u for u in result.uncertainties)

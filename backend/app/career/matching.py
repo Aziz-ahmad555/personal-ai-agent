@@ -157,6 +157,9 @@ class ComponentResult:
     summary: str = ""
     reason: str | None = None  # why not assessed
     details: list[dict[str, Any]] = field(default_factory=list)
+    # Things this component couldn't verify even though it was assessed; surfaced in the
+    # match's uncertainties list, not stored on the component itself.
+    caveats: list[str] = field(default_factory=list)
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -337,6 +340,7 @@ def _work_mode_location_component(job: JobFacts, profile: ProfileFacts) -> Compo
     prefs = profile.preferences
     checks: list[float] = []
     details: list[dict[str, Any]] = []
+    unverifiable: list[str] = []
 
     if job.remote_type != "unknown" and prefs.remote_preference != "no_preference":
         if job.remote_type == prefs.remote_preference:
@@ -366,25 +370,45 @@ def _work_mode_location_component(job: JobFacts, profile: ProfileFacts) -> Compo
             ),
             None,
         )
-        checks.append(1.0 if hit else 0.0)
-        details.append(
-            {
-                "check": "location",
-                "posting": job.location,
-                "preference": ", ".join(prefs.locations),
-                "matched": hit,
-                "fraction": 1.0 if hit else 0.0,
-            }
-        )
+        location_detail: dict[str, Any] = {
+            "check": "location",
+            "posting": job.location,
+            "preference": ", ".join(prefs.locations),
+            "matched": hit,
+        }
+        if hit:
+            checks.append(1.0)
+            location_detail["fraction"] = 1.0
+        else:
+            # Plain string matching can't tell that a city lies inside a preferred country
+            # (or region), so "no textual match" is not evidence of a mismatch. Don't score
+            # it as 0 — leave it out and say so.
+            location_detail["note"] = (
+                "No textual match, but this can't tell whether the posting's location lies "
+                "inside one of your preferred places (e.g. a city within a country), so it "
+                "isn't counted against you."
+            )
+            unverifiable.append(
+                f"Location: '{job.location}' doesn't textually match your preferred "
+                f"locations ({', '.join(prefs.locations)}); it may still be inside one."
+            )
+        details.append(location_detail)
 
     if not checks:
-        return _not_assessed(
+        result = _not_assessed(
             key,
             "the posting doesn't state a work mode/location, or your preferences don't "
-            "constrain them.",
+            "constrain them, or its location couldn't be matched to your preferred places.",
         )
+        result.details = details
+        result.caveats = unverifiable
+        return result
     fraction = sum(checks) / len(checks)
-    return _assessed(key, fraction, f"{len(checks)} check(s) against your preferences.", details)
+    result = _assessed(
+        key, fraction, f"{len(checks)} check(s) against your preferences.", details
+    )
+    result.caveats = unverifiable
+    return result
 
 
 def _salary_component(job: JobFacts, profile: ProfileFacts) -> ComponentResult:
@@ -505,6 +529,7 @@ def score_match(
     score = round(100 * earned / assessed_weight) if assessed_weight else None
 
     uncertainties = [f"{c.label}: {c.reason}" for c in components if c.status == "not_assessed"]
+    uncertainties.extend(caveat for c in components for caveat in c.caveats)
     if requirements.dropped_unverified:
         uncertainties.append(
             f"{requirements.dropped_unverified} extracted requirement(s) were discarded because "
