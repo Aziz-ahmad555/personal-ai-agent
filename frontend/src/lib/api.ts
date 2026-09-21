@@ -1057,3 +1057,64 @@ export const coversApi = {
     })
   },
 }
+
+// --- Career: ATS compatibility check ---
+
+export type AtsKeywordState = 'in_context' | 'listed_only' | 'gap'
+export type AtsCheckStatus = 'pass' | 'warn' | 'fail'
+
+export interface AtsKeyword {
+  name: string
+  kind: 'required' | 'preferred'
+  state: AtsKeywordState
+  detail: string
+  /** For a skill only in the Skills list: roles whose evidence points at it. */
+  roles: string[]
+}
+
+export interface AtsKeywordStats {
+  required_found: number
+  required_total: number
+  preferred_found: number
+  preferred_total: number
+  in_context: number
+  /** null when the posting listed no skills to check — never a made-up number. */
+  coverage_percent: number | null
+}
+
+export interface AtsCheckItem {
+  key: string
+  label: string
+  status: AtsCheckStatus
+  detail: string
+}
+
+export interface AtsCheck {
+  /** Which resume was checked: the tailored draft with accepted changes, or the profile-built one. */
+  resume_source: 'tailored' | 'profile'
+  accepted_changes: number
+  keyword_stats: AtsKeywordStats
+  keywords: AtsKeyword[]
+  checks: AtsCheckItem[]
+  summary: { passed: number; warn: number; fail: number }
+  limitations: string[]
+}
+
+export interface AtsSafeExport {
+  filename: string
+  text: string
+  resume_source: 'tailored' | 'profile'
+  accepted_changes: number
+}
+
+export const atsApi = {
+  check(token: string, jobId: string) {
+    return apiFetch<AtsCheck>(`/career/jobs/${jobId}/ats-check`, {
+      method: 'POST',
+      headers: authHeaders(token),
+    })
+  },
+  safeExport(token: string, jobId: string) {
+    return apiFetch<AtsSafeExport>(`/career/jobs/${jobId}/ats-safe`, { headers: authHeaders(token) })
+  },
+}
