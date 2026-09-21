@@ -483,3 +483,27 @@ async def test_a_status_date_before_the_previous_status_change_is_rejected(
     assert "before an earlier status change" in response.json()["detail"]
     unchanged = (await client.get(f"/career/applications/{app_id}", headers=auth_headers)).json()
     assert unchanged["status"] == "applied"
+
+
+async def test_editing_notes_or_follow_up_is_audited_without_copying_the_notes(
+    client: AsyncClient,
+    auth_headers: dict[str, str],
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    job_id = await _make_job(session_factory)
+    app_id = (await _track(client, auth_headers, job_id))["id"]
+
+    await client.patch(
+        f"/career/applications/{app_id}",
+        headers=auth_headers,
+        json={"notes": "Private thoughts about the salary", "next_action_text": "Call back"},
+    )
+
+    async with session_factory() as db:
+        entry = (
+            await db.execute(
+                select(AuditLog).where(AuditLog.action == "career.application.updated")
+            )
+        ).scalar_one()
+    assert entry.evidence == {"fields": ["next_action_text", "notes"]}
+    assert "Private thoughts" not in str(entry.evidence) + entry.summary

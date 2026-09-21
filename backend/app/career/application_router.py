@@ -239,6 +239,18 @@ async def update_application(
         application.next_action_text = body.next_action_text or None
     if "next_action_on" in sent:
         application.next_action_on = body.next_action_on
+    # Field names only — notes can be personal, and the audit trail records *that* something
+    # changed, not a second copy of what it was.
+    await log_action(
+        db,
+        user_id=user.id,
+        action="career.application.updated",
+        risk_level="green",
+        summary="Edited an application's notes or follow-up.",
+        evidence={"fields": sorted(sent & {"notes", "next_action_text", "next_action_on"})},
+        resource_type="application",
+        resource_id=application.id,
+    )
     await db.commit()
     await db.refresh(application)
     return await _build_detail(db, application)
