@@ -5,6 +5,9 @@ import { EmptyState } from '@/components/layout/empty-state'
 import { ErrorState } from '@/components/layout/error-state'
 import type { CareerJob } from '@/lib/api'
 import { FraudBadge, VerificationBadge } from '@/features/career/badges'
+import { Link } from 'react-router-dom'
+import { ApplicationStatusBadge } from '@/features/applications/badges'
+import { useApplications, useTrackJob } from '@/features/applications/hooks'
 import { useMatchJob, useVerifyJob, useVerifyingJobIds } from '@/features/career/hooks'
 import { MatchPanel } from '@/features/career/MatchPanel'
 
@@ -105,6 +108,8 @@ interface JobDetailProps {
 export function JobDetail({ job }: JobDetailProps) {
   const matchJob = useMatchJob()
   const verifyingIds = useVerifyingJobIds()
+  const { data: applications } = useApplications()
+  const trackJob = useTrackJob()
 
   if (!job) {
     return (
@@ -120,6 +125,7 @@ export function JobDetail({ job }: JobDetailProps) {
     )
   }
 
+  const application = applications?.find((a) => a.job_posting_id === job.id)
   const salary = formatSalary(job)
   const meta = [
     job.company_name,
@@ -155,6 +161,42 @@ export function JobDetail({ job }: JobDetailProps) {
                 {job.description_text}
               </p>
             </details>
+          </CardContent>
+        )}
+      </Card>
+
+      <Card>
+        <CardContent className="flex flex-wrap items-center justify-between gap-3 pt-6 text-sm">
+          {application ? (
+            <>
+              <span className="flex items-center gap-2">
+                You&apos;re tracking this application: <ApplicationStatusBadge status={application.status} />
+              </span>
+              <Button asChild variant="outline" size="sm">
+                <Link to={`/applications?selected=${application.id}`}>View application</Link>
+              </Button>
+            </>
+          ) : (
+            <>
+              <span className="text-muted-foreground">
+                Applying? Track it to keep a dated record of where it stands.
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => trackJob.mutate(job.id)}
+                disabled={trackJob.isPending}
+              >
+                {trackJob.isPending ? 'Starting…' : 'Track this application'}
+              </Button>
+            </>
+          )}
+        </CardContent>
+        {trackJob.isError && (
+          <CardContent>
+            <ErrorState
+              message={trackJob.error instanceof Error ? trackJob.error.message : 'Failed to start tracking'}
+            />
           </CardContent>
         )}
       </Card>

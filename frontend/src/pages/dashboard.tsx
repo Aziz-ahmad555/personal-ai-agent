@@ -1,9 +1,10 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { Briefcase, FolderSearch, Search } from 'lucide-react'
+import { Briefcase, ClipboardList, FolderSearch, Search } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ErrorState } from '@/components/layout/error-state'
+import { FollowUpsDue } from '@/features/applications/FollowUpsDue'
 import { authApi } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth'
 
@@ -42,6 +43,8 @@ export function DashboardPage() {
         </CardContent>
       </Card>
 
+      <FollowUpsDue />
+
       <div className="grid gap-4 sm:grid-cols-2">
         <Link
           to="/research"
@@ -76,6 +79,18 @@ export function DashboardPage() {
             <p className="text-sm font-medium">Career</p>
             <p className="text-sm text-muted-foreground">
               Add job postings and see how well each fits you, with the evidence.
+            </p>
+          </div>
+        </Link>
+        <Link
+          to="/applications"
+          className="flex items-start gap-3 rounded-lg border border-border p-4 transition-colors hover:bg-accent"
+        >
+          <ClipboardList className="h-5 w-5 shrink-0 text-muted-foreground" />
+          <div>
+            <p className="text-sm font-medium">Applications</p>
+            <p className="text-sm text-muted-foreground">
+              Track where each application stands, with a dated timeline.
             </p>
           </div>
         </Link>

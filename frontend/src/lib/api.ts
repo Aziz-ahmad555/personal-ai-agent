@@ -646,3 +646,136 @@ export const careerApi = {
     })
   },
 }
+
+// --- Career: application tracker ---
+
+export type ApplicationStatus =
+  | 'saved'
+  | 'applied'
+  | 'screening'
+  | 'interviewing'
+  | 'offer'
+  | 'accepted'
+  | 'rejected'
+  | 'withdrawn'
+  | 'no_response'
+export type ApplicationEventType = 'status_change' | 'note' | 'interview'
+export type FollowUpState = 'overdue' | 'due_today' | 'upcoming'
+
+export interface ApplicationJobSummary {
+  id: string
+  title: string | null
+  company_name: string | null
+  location: string | null
+  remote_type: RemoteType
+  source_url: string | null
+}
+
+export interface ApplicationMatchSummary {
+  score_percent: number | null
+  low_confidence: boolean
+}
+
+export interface Application {
+  id: string
+  job_posting_id: string
+  status: ApplicationStatus
+  notes: string | null
+  applied_on: string | null
+  next_action_text: string | null
+  next_action_on: string | null
+  follow_up_state: FollowUpState | null
+  job: ApplicationJobSummary | null
+  /** The posting's *current* match — the snapshot from when the user applied is on the event. */
+  match: ApplicationMatchSummary | null
+  /** The server owns the transition rules; the UI offers exactly what these say. */
+  allowed_transitions: ApplicationStatus[]
+  reopen_targets: ApplicationStatus[]
+  created_at: string
+  updated_at: string
+}
+
+/** What was known about the posting at the moment the user applied. Absent parts are null. */
+export interface ApplySnapshot {
+  captured_at: string
+  match: { score_percent: number | null; assessed_weight: number; low_confidence: boolean } | null
+  fraud_risk_level: FraudRiskLevel | null
+  employer_verification: EmployerVerificationStatus | null
+}
+
+export interface ApplicationEvent {
+  id: string
+  event_type: ApplicationEventType
+  from_status: ApplicationStatus | null
+  to_status: ApplicationStatus | null
+  occurred_on: string
+  body: string | null
+  snapshot: ApplySnapshot | null
+  created_at: string
+}
+
+export interface ApplicationDetail extends Application {
+  events: ApplicationEvent[]
+}
+
+export interface ApplicationStatusChangeInput {
+  status: ApplicationStatus
+  occurred_on?: string | null
+  note?: string | null
+}
+
+export interface ApplicationEventInput {
+  event_type: 'note' | 'interview'
+  occurred_on?: string | null
+  body: string
+}
+
+/** Only keys present are changed; an explicit null clears the field. */
+export interface ApplicationPatch {
+  notes?: string | null
+  next_action_text?: string | null
+  next_action_on?: string | null
+}
+
+export const applicationsApi = {
+  list(token: string) {
+    return apiFetch<Application[]>('/career/applications', { headers: authHeaders(token) })
+  },
+  get(token: string, id: string) {
+    return apiFetch<ApplicationDetail>(`/career/applications/${id}`, { headers: authHeaders(token) })
+  },
+  create(token: string, jobPostingId: string) {
+    return apiFetch<ApplicationDetail>('/career/applications', {
+      method: 'POST',
+      headers: authHeaders(token),
+      body: JSON.stringify({ job_posting_id: jobPostingId }),
+    })
+  },
+  changeStatus(token: string, id: string, input: ApplicationStatusChangeInput) {
+    return apiFetch<ApplicationDetail>(`/career/applications/${id}/status`, {
+      method: 'POST',
+      headers: authHeaders(token),
+      body: JSON.stringify(input),
+    })
+  },
+  addEvent(token: string, id: string, input: ApplicationEventInput) {
+    return apiFetch<ApplicationDetail>(`/career/applications/${id}/events`, {
+      method: 'POST',
+      headers: authHeaders(token),
+      body: JSON.stringify(input),
+    })
+  },
+  update(token: string, id: string, patch: ApplicationPatch) {
+    return apiFetch<ApplicationDetail>(`/career/applications/${id}`, {
+      method: 'PATCH',
+      headers: authHeaders(token),
+      body: JSON.stringify(patch),
+    })
+  },
+  delete(token: string, id: string) {
+    return apiFetch<void>(`/career/applications/${id}`, {
+      method: 'DELETE',
+      headers: authHeaders(token),
+    })
+  },
+}
