@@ -21,7 +21,7 @@ export function LoginPage() {
     event.preventDefault()
     try {
       await login(email, password)
-      navigate('/')
+      navigate('/dashboard')
     } catch {
       // Failure is surfaced via the store's `error` field below.
     }

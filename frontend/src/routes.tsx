@@ -1,6 +1,7 @@
 import { createBrowserRouter } from 'react-router-dom'
 import { AppShell } from '@/components/layout/app-shell'
 import { ProtectedRoute } from '@/components/layout/protected-route'
+import { LandingRoute } from '@/features/landing/route'
 import { LoginPage } from '@/pages/login'
 import { DashboardPage } from '@/pages/dashboard'
 import { ProfilePage } from '@/pages/profile'
@@ -11,16 +12,19 @@ import { CareerPage } from '@/pages/career'
 import { ApplicationsPage } from '@/pages/applications'
 
 export const router = createBrowserRouter([
-  { path: '/login', element: <LoginPage /> },
   {
     path: '/',
+    element: <LandingRoute />,
+  },
+  { path: '/login', element: <LoginPage /> },
+  {
     element: (
       <ProtectedRoute>
         <AppShell />
       </ProtectedRoute>
     ),
     children: [
-      { index: true, element: <DashboardPage /> },
+      { path: 'dashboard', element: <DashboardPage /> },
       { path: 'profile', element: <ProfilePage /> },
       { path: 'research', element: <ResearchPage /> },
       { path: 'search', element: <SearchPage /> },

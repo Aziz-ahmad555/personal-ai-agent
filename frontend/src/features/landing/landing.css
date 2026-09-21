@@ -1,0 +1,379 @@
+/* Scoped to .landing so the app's own theme is untouched. */
+.landing {
+  --l-bg: #0a0e13;
+  --l-panel: #131920;
+  --l-line: rgba(230, 237, 243, 0.1);
+  --l-text: #e6edf3;
+  --l-muted: #8b98a5;
+  --l-teal: #2fe6a8;
+  --l-amber: #f2a93b;
+  --l-red: #f0495c;
+
+  position: relative;
+  isolation: isolate;
+  min-height: 100vh;
+  overflow-x: clip;
+  background: var(--l-bg);
+  color: var(--l-text);
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  line-height: 1.6;
+}
+
+.landing a {
+  color: inherit;
+}
+.landing a:focus-visible {
+  outline: 2px solid var(--l-teal);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+.lp-canvas {
+  position: fixed !important;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+.lp-content {
+  position: relative;
+  z-index: 1;
+}
+
+.lp-display {
+  font-family: 'Space Grotesk Variable', 'Space Grotesk', system-ui, sans-serif;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+.lp-mono {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.lp-nav {
+  position: absolute;
+  inset: 0 0 auto 0;
+  z-index: 2;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px clamp(16px, 4vw, 48px);
+  font-size: 0.95rem;
+}
+.lp-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+}
+.lp-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  margin: 0 6px 0 12px;
+}
+.lp-brand .lp-dot {
+  margin: 0;
+}
+
+/* Hero: the scene fills it; copy sits on top and lets drags through. */
+.lp-hero {
+  position: relative;
+  min-height: 100svh;
+  display: flex;
+  align-items: center;
+  padding: 96px clamp(16px, 4vw, 48px) 64px;
+  touch-action: pan-y;
+  cursor: grab;
+}
+.lp-hero:active {
+  cursor: grabbing;
+}
+@media (max-width: 899px) {
+  .lp-hero {
+    align-items: flex-start;
+  }
+}
+.lp-view {
+  position: absolute;
+  inset: 0;
+}
+.lp-hero-copy {
+  position: relative;
+  max-width: 34rem;
+  pointer-events: none;
+}
+.lp-hero-copy a {
+  pointer-events: auto;
+}
+.lp-h1 {
+  font-size: clamp(2.6rem, 7vw, 4.6rem);
+  font-weight: 600;
+  margin: 0 0 20px;
+}
+.lp-h2 {
+  font-size: clamp(1.8rem, 4vw, 2.6rem);
+  font-weight: 600;
+  margin: 0 0 16px;
+}
+.lp-lede {
+  color: var(--l-muted);
+  font-size: 1.1rem;
+  max-width: 34rem;
+  margin: 0 0 28px;
+}
+.lp-actions {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 28px;
+}
+.lp-btn {
+  display: inline-block;
+  padding: 12px 22px;
+  border-radius: 8px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.landing a.lp-btn-primary {
+  background: var(--l-teal);
+  color: var(--l-bg);
+}
+.lp-btn-primary:hover {
+  filter: brightness(1.08);
+}
+.lp-legend {
+  font-size: 0.85rem;
+  color: var(--l-muted);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  margin: 0;
+}
+.lp-legend .lp-dot:first-child {
+  margin-left: 0;
+}
+.lp-legend-hint {
+  flex-basis: 100%;
+  margin-top: 6px;
+}
+.lp-fallback-hero {
+  position: absolute;
+  top: 50%;
+  right: 2%;
+  width: min(52%, 620px);
+  transform: translateY(-50%);
+  opacity: 0.85;
+}
+@media (max-width: 899px) {
+  .lp-fallback-hero {
+    top: auto;
+    bottom: 24px;
+    right: 0;
+    width: 100%;
+    max-height: 44%;
+    transform: none;
+  }
+}
+
+/* Sections */
+.lp-section {
+  padding: clamp(56px, 9vw, 120px) clamp(16px, 4vw, 48px);
+  max-width: 1200px;
+  margin: 0 auto;
+}
+.lp-split {
+  display: grid;
+  gap: clamp(28px, 5vw, 64px);
+  grid-template-columns: 1fr;
+  align-items: start;
+}
+@media (min-width: 900px) {
+  .lp-split {
+    grid-template-columns: 1fr 1fr;
+    align-items: center;
+  }
+}
+.lp-visual {
+  position: relative;
+  height: clamp(260px, 44vw, 440px);
+}
+.lp-visual-pair {
+  display: grid;
+  gap: 16px;
+}
+.lp-fallback {
+  width: 100%;
+  height: 100%;
+}
+
+/* Evidence card */
+.lp-card {
+  background: var(--l-panel);
+  border: 1px solid var(--l-line);
+  border-radius: 12px;
+  padding: 24px;
+}
+.lp-note {
+  margin: 0 0 8px;
+  font-size: 0.85rem;
+  color: var(--l-muted);
+}
+.lp-card-title {
+  margin: 0 0 12px;
+  font-size: 1.35rem;
+  font-weight: 600;
+}
+.lp-score {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 0 0 16px;
+  color: var(--l-muted);
+}
+.lp-score-value {
+  font-size: 2.4rem;
+  font-weight: 500;
+  color: var(--l-muted);
+  transition: color 0.4s ease;
+}
+.lp-card[data-locked='true'] .lp-score-value {
+  color: var(--l-teal);
+}
+.lp-checks {
+  margin: 0 0 14px;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 8px;
+  font-size: 0.95rem;
+}
+.lp-checks li {
+  padding-left: 18px;
+  position: relative;
+}
+.lp-checks li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.6em;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--l-muted);
+  transition: background 0.4s ease;
+}
+.lp-card[data-locked='true'] .lp-checks li::before {
+  background: var(--l-teal);
+}
+.lp-stamp {
+  margin: 0 0 14px;
+  font-size: 0.85rem;
+  color: var(--l-muted);
+}
+.lp-uncertainty {
+  margin: 0;
+  padding: 10px 12px;
+  border-left: 3px solid var(--l-amber);
+  background: rgba(242, 169, 59, 0.08);
+  font-size: 0.95rem;
+}
+
+/* Trust ladder */
+.lp-ladder {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+.lp-ladder li {
+  display: grid;
+  gap: 2px;
+  padding: 6px 0 6px 14px;
+  border-left: 3px solid var(--l-muted);
+  color: var(--l-muted);
+}
+.lp-ladder strong {
+  color: var(--l-text);
+  font-weight: 600;
+}
+@media (min-width: 900px) {
+  .lp-split-flip > .lp-visual {
+    order: 0;
+  }
+}
+
+/* Risk scale: on wide screens the gauge stays put while the tier copy scrolls past it. On phones
+   the gauge and all three tiers fit on one screen, so nothing needs to stick. */
+.lp-sticky {
+  align-self: start;
+}
+@media (min-width: 900px) {
+  .lp-sticky {
+    position: sticky;
+    top: 20vh;
+  }
+}
+.lp-visual-gauge {
+  height: clamp(200px, 34vw, 380px);
+}
+.lp-needle {
+  transition: transform 0.5s ease;
+}
+.lp-risk-tiers {
+  display: grid;
+  gap: 0;
+}
+.lp-risk-tier {
+  padding: 8px 0 20px 16px;
+  border-left: 2px solid var(--l-line);
+  opacity: 0.55;
+  transition: opacity 0.3s ease, border-color 0.3s ease;
+}
+@media (min-width: 900px) {
+  .lp-risk-tier {
+    min-height: 46vh;
+  }
+}
+.lp-risk-tier[data-active='true'] {
+  opacity: 1;
+  border-left-color: var(--l-text);
+}
+.lp-risk-tier h3 {
+  margin: 0 0 8px;
+  font-size: 1.4rem;
+  font-weight: 600;
+}
+.lp-risk-tier h3 span {
+  color: var(--l-muted);
+  font-size: 1rem;
+  font-weight: 400;
+}
+.lp-risk-tier p {
+  margin: 0;
+  color: var(--l-muted);
+  max-width: 32rem;
+}
+
+.lp-footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 40px clamp(16px, 4vw, 48px);
+  border-top: 1px solid var(--l-line);
+  color: var(--l-muted);
+  font-size: 0.9rem;
+}
+.lp-footer p {
+  margin: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-needle,
+  .lp-risk-tier,
+  .lp-score-value,
+  .lp-checks li::before {
+    transition: none;
+  }
+}

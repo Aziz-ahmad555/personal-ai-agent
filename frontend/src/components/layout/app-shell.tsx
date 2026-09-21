@@ -1,4 +1,4 @@
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Command, LogOut } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -8,7 +8,7 @@ import { CommandPalette } from '@/components/ui/command-palette'
 import { useAuthStore } from '@/stores/auth'
 
 const NAV_ITEMS = [
-  { to: '/', label: 'Dashboard' },
+  { to: '/dashboard', label: 'Dashboard' },
   { to: '/profile', label: 'Profile' },
   { to: '/research', label: 'Research' },
   { to: '/search', label: 'Search' },
@@ -42,7 +42,6 @@ export function AppShell() {
               <NavLink
                 key={item.to}
                 to={item.to}
-                end={item.to === '/'}
                 className={({ isActive }) =>
                   cn(
                     'rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-accent hover:text-accent-foreground',
@@ -79,6 +78,11 @@ export function AppShell() {
       >
         <Outlet />
       </motion.main>
+      <footer className="border-t border-border px-4 py-3 text-xs text-muted-foreground sm:px-6">
+        <Link to="/" className="underline-offset-4 hover:text-foreground hover:underline">
+          About Personal AI Agent
+        </Link>
+      </footer>
     </div>
   )
 }
