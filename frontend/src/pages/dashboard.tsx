@@ -1,8 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
-import { FolderSearch } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { FolderSearch, Search } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { EmptyState } from '@/components/layout/empty-state'
 import { ErrorState } from '@/components/layout/error-state'
 import { authApi } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth'
@@ -42,11 +42,32 @@ export function DashboardPage() {
         </CardContent>
       </Card>
 
-      <EmptyState
-        icon={<FolderSearch className="h-8 w-8" />}
-        title="Research Engine not built yet"
-        description="Job research, source verification, and confidence scoring arrive in Phase 3."
-      />
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Link
+          to="/research"
+          className="flex items-start gap-3 rounded-lg border border-border p-4 transition-colors hover:bg-accent"
+        >
+          <FolderSearch className="h-5 w-5 shrink-0 text-muted-foreground" />
+          <div>
+            <p className="text-sm font-medium">Research</p>
+            <p className="text-sm text-muted-foreground">
+              Ask a question, get a cited, confidence-scored answer.
+            </p>
+          </div>
+        </Link>
+        <Link
+          to="/search"
+          className="flex items-start gap-3 rounded-lg border border-border p-4 transition-colors hover:bg-accent"
+        >
+          <Search className="h-5 w-5 shrink-0 text-muted-foreground" />
+          <div>
+            <p className="text-sm font-medium">Search</p>
+            <p className="text-sm text-muted-foreground">
+              Semantic search across your profile and past research.
+            </p>
+          </div>
+        </Link>
+      </div>
     </div>
   )
 }

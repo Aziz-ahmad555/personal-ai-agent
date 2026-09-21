@@ -195,6 +195,198 @@ export interface PreferencesInput {
   deal_breakers?: string | null
 }
 
+// --- Research Engine ---
+
+export type ResearchQueryStatus = 'pending' | 'running' | 'completed' | 'failed'
+export type SourceTier = 'official' | 'government' | 'docs' | 'reputable_secondary' | 'forum_anecdotal' | 'unknown'
+export type ClaimStatus = 'corroborated' | 'single_source' | 'contradicted' | 'unverified'
+export type CitationStance = 'supports' | 'contradicts' | 'context_only'
+
+export interface ResearchQuery {
+  id: string
+  query_text: string
+  purpose: string | null
+  status: ResearchQueryStatus
+  error: string | null
+  created_at: string
+  completed_at: string | null
+}
+
+export interface ResearchSource {
+  id: string
+  original_url: string
+  domain: string
+  title: string | null
+  tier: SourceTier
+  tier_rationale: string
+  http_status: number | null
+  fetch_error: string | null
+  fetched_at: string | null
+  published_at: string | null
+}
+
+export interface ResearchCitation {
+  id: string
+  source_id: string
+  excerpt: string
+  stance: CitationStance
+  excerpt_verified: boolean
+}
+
+export interface ResearchClaim {
+  id: string
+  claim_text: string
+  claim_type: string | null
+  value: Record<string, unknown> | null
+  status: ClaimStatus
+  confidence_score: number
+  confidence_rationale: string
+  citations: ResearchCitation[]
+}
+
+export interface ResearchReport {
+  id: string
+  summary: string
+  uncertainties: string[]
+  claim_ids: string[]
+  model_used: string | null
+  generated_at: string
+}
+
+export interface ResearchQueryDetail extends ResearchQuery {
+  sources: ResearchSource[]
+  claims: ResearchClaim[]
+  report: ResearchReport | null
+}
+
+export interface ResearchQueryInput {
+  query_text: string
+  purpose?: string | null
+}
+
+export const researchApi = {
+  list(token: string) {
+    return apiFetch<ResearchQuery[]>('/research/queries', { headers: authHeaders(token) })
+  },
+  create(token: string, input: ResearchQueryInput) {
+    return apiFetch<ResearchQuery>('/research/queries', {
+      method: 'POST',
+      headers: authHeaders(token),
+      body: JSON.stringify(input),
+    })
+  },
+  get(token: string, id: string) {
+    return apiFetch<ResearchQueryDetail>(`/research/queries/${id}`, { headers: authHeaders(token) })
+  },
+}
+
+// --- Semantic search ---
+
+export type SearchResultType =
+  | 'bio'
+  | 'work_experience'
+  | 'education'
+  | 'skill_evidence'
+  | 'preferences'
+  | 'research_claim'
+  | 'research_source'
+
+export type SearchLinkKind = 'profile' | 'research'
+
+export interface SearchResultLink {
+  kind: SearchLinkKind
+  query_id: string | null
+  anchor: string | null
+}
+
+export interface SearchResult {
+  id: string
+  type: SearchResultType
+  title: string
+  snippet: string
+  link: SearchResultLink
+}
+
+export interface SearchResponse {
+  query: string
+  results: SearchResult[]
+}
+
+export const searchApi = {
+  search(token: string, q: string) {
+    return apiFetch<SearchResponse>(`/search?q=${encodeURIComponent(q)}`, {
+      headers: authHeaders(token),
+    })
+  },
+}
+
+// --- Gmail (read-only) ---
+
+export type GmailConnectionStatus = 'connected' | 'needs_reauth' | 'disconnected'
+export type GmailSyncRunStatus = 'pending' | 'running' | 'completed' | 'failed'
+export type GmailSyncType = 'backfill' | 'incremental'
+
+export interface GmailConnection {
+  id: string
+  google_email: string
+  status: GmailConnectionStatus
+  last_synced_at: string | null
+  last_sync_error: string | null
+  created_at: string
+}
+
+export interface GmailSyncRun {
+  id: string
+  sync_type: GmailSyncType
+  status: GmailSyncRunStatus
+  messages_fetched: number
+  messages_stored: number
+  error: string | null
+  started_at: string
+  completed_at: string | null
+}
+
+export interface EmailMessageSummary {
+  id: string
+  gmail_message_id: string
+  thread_id: string
+  subject: string | null
+  from_address: string | null
+  to_addresses: string[]
+  date: string | null
+  snippet: string
+  label_ids: string[]
+}
+
+export const gmailApi = {
+  getConnection(token: string) {
+    return apiFetch<GmailConnection>('/gmail/connection', { headers: authHeaders(token) })
+  },
+  oauthStart(token: string) {
+    return apiFetch<{ authorization_url: string }>('/gmail/oauth/start', {
+      headers: authHeaders(token),
+    })
+  },
+  startSync(token: string) {
+    return apiFetch<GmailSyncRun>('/gmail/sync', { method: 'POST', headers: authHeaders(token) })
+  },
+  listSyncRuns(token: string) {
+    return apiFetch<GmailSyncRun[]>('/gmail/sync', { headers: authHeaders(token) })
+  },
+  listMessages(token: string, limit = 50) {
+    return apiFetch<EmailMessageSummary[]>(`/gmail/messages?limit=${limit}`, {
+      headers: authHeaders(token),
+    })
+  },
+  disconnect(token: string, purgeData: boolean) {
+    return apiFetch<GmailConnection>('/gmail/connection', {
+      method: 'DELETE',
+      headers: authHeaders(token),
+      body: JSON.stringify({ purge_data: purgeData }),
+    })
+  },
+}
+
 export const profileApi = {
   get(token: string) {
     return apiFetch<Profile>('/profile', { headers: authHeaders(token) })

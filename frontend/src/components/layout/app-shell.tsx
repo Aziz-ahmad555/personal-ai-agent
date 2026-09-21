@@ -10,6 +10,9 @@ import { useAuthStore } from '@/stores/auth'
 const NAV_ITEMS = [
   { to: '/', label: 'Dashboard' },
   { to: '/profile', label: 'Profile' },
+  { to: '/research', label: 'Research' },
+  { to: '/search', label: 'Search' },
+  { to: '/gmail', label: 'Gmail' },
 ]
 
 export function AppShell() {
