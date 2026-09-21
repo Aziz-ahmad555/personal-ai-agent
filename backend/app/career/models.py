@@ -393,3 +393,64 @@ class ResumeChange(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+
+class CoverLetter(Base):
+    """A cover letter drafted for one job, in which every factual sentence traced to evidence
+    (see app.career.cover_verify). Local draft only — nothing is sent anywhere. Paragraphs are
+    accepted or rejected individually; only accepted ones appear in the export."""
+
+    __tablename__ = "cover_letters"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    job_posting_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("job_postings.id", ondelete="CASCADE"), unique=True, nullable=False
+    )
+    status: Mapped[str] = mapped_column(String(20), default="running", nullable=False)
+    error: Mapped[str | None] = mapped_column(Text)
+    # See TailoredResume.started_at: orphaned runs read as failed after a timeout.
+    started_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    # The base resume the letter was checked against, and the signer's name, frozen at
+    # generation time so what was reviewed is what gets exported.
+    base: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+    requirements: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list, nullable=False)
+    # Required/preferred skills the profile has no evidence for: listed, never claimed.
+    gaps: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list, nullable=False)
+    # Sentences discarded by fact-checking, with the reason: [{sentence, reason}].
+    dropped: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list, nullable=False)
+    profile_stamp: Mapped[str | None] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+COVER_PARAGRAPH_ROLES = ("opening", "body", "closing")
+
+
+class CoverLetterParagraph(Base):
+    """One paragraph. `sentences` keeps each surviving sentence with the evidence it was
+    checked against: [{text, kind: "fact"|"framing", supports: [{type, ref, label, excerpt}]}].
+    `edited_text` is the user's own rewrite — their words, so it is *not* fact-checked, and the
+    UI says so."""
+
+    __tablename__ = "cover_letter_paragraphs"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    letter_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("cover_letters.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    position: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    role: Mapped[str] = mapped_column(String(10), nullable=False)
+    sentences: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list, nullable=False)
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    edited_text: Mapped[str | None] = mapped_column(Text)
+    decision: Mapped[str] = mapped_column(String(10), default="pending", nullable=False)
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )

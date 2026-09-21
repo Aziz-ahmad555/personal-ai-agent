@@ -29,11 +29,11 @@ _WORD_RE = re.compile(r"[A-Za-z][A-Za-z0-9+#]*")
 _SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])\s+|\n+")
 
 
-def _numbers(text: str) -> set[str]:
+def numbers_in(text: str) -> set[str]:
     return {m.replace(",", "") for m in _NUMBER_RE.findall(text)}
 
 
-def _words(text: str) -> set[str]:
+def words_in(text: str) -> set[str]:
     return {w.lower() for w in _WORD_RE.findall(text)}
 
 
@@ -95,7 +95,7 @@ def verify_rewrite(
     if len(new) > len(source_text) * MAX_GROWTH_FACTOR + MAX_GROWTH_SLACK_CHARS:
         return "it is much longer than the original, which is where invented detail hides"
 
-    added_numbers = sorted(_numbers(new) - _numbers(source_text))
+    added_numbers = sorted(numbers_in(new) - numbers_in(source_text))
     if added_numbers:
         return f"it adds number(s) not in the original: {', '.join(added_numbers)}"
 
@@ -107,7 +107,7 @@ def verify_rewrite(
         ):
             return f"it claims '{term}', which your profile doesn't support for this item"
 
-    novel = novel_terms(new, allowed_words | _words(source_text))
+    novel = novel_terms(new, allowed_words | words_in(source_text))
     if novel:
         return f"it introduces {', '.join(repr(t) for t in novel)}, found nowhere in your profile"
 

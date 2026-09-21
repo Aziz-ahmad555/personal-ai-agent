@@ -7,7 +7,6 @@ one LLM call proposing rewordings -> plain-code verification of every proposal (
 claims are dropped, and counted) -> plain-code skill reordering and gap detection -> persist.
 """
 
-import re
 import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -29,7 +28,7 @@ from app.career.resume_base import (
     render_markdown,
 )
 from app.career.resume_llm import RewriteProposal, TailorItem, propose_rewrites
-from app.career.resume_verify import find_gaps, reorder_skills, verify_rewrite
+from app.career.resume_verify import find_gaps, reorder_skills, verify_rewrite, words_in
 from app.config import get_settings
 from app.db.models import User
 from app.logging import get_logger
@@ -45,8 +44,6 @@ STALLED_MESSAGE = (
     "This run didn't finish — the server was probably restarted while it was working. Try again."
 )
 
-_WORD_RE = re.compile(r"[A-Za-z][A-Za-z0-9+#]*")
-
 
 class TailorError(RuntimeError):
     """The resume couldn't be tailored at all; the message is shown to the user as-is."""
@@ -54,10 +51,6 @@ class TailorError(RuntimeError):
 
 def _as_utc(value: datetime) -> datetime:
     return value if value.tzinfo is not None else value.replace(tzinfo=UTC)
-
-
-def _words(text: str) -> set[str]:
-    return {w.lower() for w in _WORD_RE.findall(text)}
 
 
 def is_stalled(resume: TailoredResume, *, now: datetime | None = None) -> bool:
@@ -95,7 +88,14 @@ async def load_base_resume(db: AsyncSession, user_id: uuid.UUID) -> ResumeBase:
             base.unevidenced_skills.append(skill.name)
             continue
         latest = max(skill.versions, key=lambda v: _as_utc(v.asserted_at))
-        base.skills.append(SkillItem(name=skill.name, level=latest.level, category=skill.category))
+        base.skills.append(
+            SkillItem(
+                name=skill.name,
+                level=latest.level,
+                category=skill.category,
+                evidence=latest.evidence,
+            )
+        )
         for version in skill.versions:
             if version.work_experience_id is not None:
                 names = linked.setdefault(str(version.work_experience_id), [])
@@ -188,7 +188,7 @@ async def _fail(
     )
 
 
-async def _requirements_for(db: AsyncSession, job: JobPosting, llm: Any) -> list[dict[str, Any]]:
+async def requirements_for(db: AsyncSession, job: JobPosting, llm: Any) -> list[dict[str, Any]]:
     """The posting's verified skill requirements: reuse the match's (already quote-checked) if
     there is one, otherwise read them fresh with the same quote-checked extractor."""
     match = (
@@ -229,7 +229,7 @@ async def _compute(
         )
 
     llm = get_llm_provider(get_settings())
-    requirements = await _requirements_for(db, job, llm)
+    requirements = await requirements_for(db, job, llm)
     if not requirements:
         raise TailorError(
             "No skill requirements could be read from this posting, so there's nothing to "
@@ -264,7 +264,7 @@ async def _compute(
             + base.unevidenced_skills
         )
     )
-    all_words = _words(base.all_text())
+    all_words = words_in(base.all_text())
     evidenced_norms = {normalize_skill(s.name) for s in base.skills}
 
     changes: list[ResumeChange] = []
@@ -299,7 +299,7 @@ async def _compute(
             allowed_norms = evidenced_norms
         else:
             exp = experiences_by_id[proposal.source_id]
-            allowed_words = _words(f"{exp.company} {exp.title} {exp.location or ''}") | _words(
+            allowed_words = words_in(f"{exp.company} {exp.title} {exp.location or ''}") | words_in(
                 " ".join(exp.linked_skills)
             )
             allowed_norms = {normalize_skill(n) for n in exp.linked_skills}

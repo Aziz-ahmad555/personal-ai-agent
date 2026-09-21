@@ -43,6 +43,8 @@ class SkillItem:
     name: str
     level: str
     category: str | None
+    # The latest evidence recorded for this skill (what makes it claimable at all).
+    evidence: str = ""
 
 
 @dataclass
