@@ -450,6 +450,70 @@ export const gmailApi = {
   },
 }
 
+// --- GitHub (read-only) and the integrations overview ---
+
+export type GithubConnectionStatus = 'connected' | 'needs_reauth' | 'disconnected'
+
+export interface GithubInstallation {
+  id: number | null
+  account: string | null
+  repository_selection: string | null
+  permissions: Record<string, string>
+}
+
+export interface GithubConnection {
+  id: string
+  github_login: string
+  status: GithubConnectionStatus
+  installations: GithubInstallation[]
+  last_error: string | null
+  created_at: string
+}
+
+export interface GithubDisconnectResult {
+  connection: GithubConnection
+  revoked_at_github: boolean
+}
+
+export const githubApi = {
+  getConnection(token: string) {
+    return apiFetch<GithubConnection>('/github/connection', { headers: authHeaders(token) })
+  },
+  oauthStart(token: string) {
+    return apiFetch<{ authorization_url: string }>('/github/oauth/start', {
+      headers: authHeaders(token),
+    })
+  },
+  disconnect(token: string) {
+    return apiFetch<GithubDisconnectResult>('/github/connection', {
+      method: 'DELETE',
+      headers: authHeaders(token),
+    })
+  },
+}
+
+export type IntegrationStatus =
+  | 'connected'
+  | 'needs_reauth'
+  | 'disconnected'
+  | 'not_connected'
+  | 'unavailable'
+
+export interface Integration {
+  key: string
+  label: string
+  status: IntegrationStatus
+  summary: string
+  path: string | null
+  reason: string | null
+}
+
+export const integrationsApi = {
+  list(token: string) {
+    return apiFetch<Integration[]>('/integrations', { headers: authHeaders(token) })
+  },
+}
+
 export const profileApi = {
   get(token: string) {
     return apiFetch<Profile>('/profile', { headers: authHeaders(token) })

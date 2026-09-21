@@ -15,6 +15,7 @@ const NAV_ITEMS = [
   { to: '/gmail', label: 'Gmail' },
   { to: '/career', label: 'Career' },
   { to: '/applications', label: 'Applications' },
+  { to: '/integrations', label: 'Integrations' },
 ]
 
 export function AppShell() {

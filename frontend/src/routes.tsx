@@ -8,6 +8,8 @@ import { ProfilePage } from '@/pages/profile'
 import { ResearchPage } from '@/pages/research'
 import { SearchPage } from '@/pages/search'
 import { GmailPage } from '@/pages/gmail'
+import { GithubPage } from '@/pages/github'
+import { IntegrationsPage } from '@/pages/integrations'
 import { CareerPage } from '@/pages/career'
 import { ApplicationsPage } from '@/pages/applications'
 
@@ -31,6 +33,8 @@ export const router = createBrowserRouter([
       { path: 'gmail', element: <GmailPage /> },
       { path: 'career', element: <CareerPage /> },
       { path: 'applications', element: <ApplicationsPage /> },
+      { path: 'integrations', element: <IntegrationsPage /> },
+      { path: 'github', element: <GithubPage /> },
     ],
   },
 ])

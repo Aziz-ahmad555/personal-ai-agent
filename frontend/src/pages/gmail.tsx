@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
 import { Card, CardContent } from '@/components/ui/card'
@@ -17,18 +17,21 @@ export function GmailPage() {
   const { data: syncRuns } = useSyncRuns()
   const lastKnownRunStatus = useRef<string | null>(null)
 
-  const oauthError = searchParams.get('error')
-  const justConnected = searchParams.get('connected') === '1'
+  // Read the one-shot OAuth redirect params once so the error stays on screen after they're
+  // cleared from the URL, and make sure the card reflects a just-completed connect.
+  const [landing] = useState(() => ({
+    error: searchParams.get('error'),
+    connected: searchParams.get('connected') === '1',
+  }))
+  const oauthError = landing.error
 
-  // Clear the one-shot OAuth redirect params from the URL after reading them, and make
-  // sure the connection card reflects the just-completed connect immediately.
   useEffect(() => {
-    if (oauthError || justConnected) {
-      if (justConnected) refetch()
+    if (landing.error || landing.connected) {
+      if (landing.connected) refetch()
       setSearchParams({}, { replace: true })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [oauthError, justConnected])
+  }, [])
 
   // When the latest sync run finishes, the connection's last_synced_at and the message
   // list are both stale until refetched — poll-driven updates only cover the run itself.

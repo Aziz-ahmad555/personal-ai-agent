@@ -1,0 +1,40 @@
+import { MemoryRouter } from 'react-router-dom'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { cleanup, render, screen } from '@testing-library/react'
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+import { GmailPage } from '@/pages/gmail'
+import { useAuthStore } from '@/stores/auth'
+
+beforeEach(() => {
+  useAuthStore.setState({ accessToken: 'token' })
+})
+
+afterEach(() => {
+  cleanup()
+  vi.unstubAllGlobals()
+  useAuthStore.setState({ accessToken: null })
+})
+
+it('keeps the connection error on screen after clearing it from the URL', async () => {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (url: string) =>
+      url.endsWith('/gmail/sync')
+        ? new Response('[]', { status: 200, headers: { 'Content-Type': 'application/json' } })
+        : new Response('{"detail":"Not found"}', { status: 404, headers: { 'Content-Type': 'application/json' } })
+    )
+  )
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+
+  render(
+    <QueryClientProvider client={client}>
+      <MemoryRouter initialEntries={['/gmail?error=access_denied']}>
+        <GmailPage />
+      </MemoryRouter>
+    </QueryClientProvider>
+  )
+
+  expect(await screen.findByText("Couldn't connect Gmail")).toBeInTheDocument()
+  expect(await screen.findByRole('button', { name: /Connect Gmail/ })).toBeInTheDocument()
+  expect(screen.getByText('access_denied')).toBeInTheDocument()
+})
