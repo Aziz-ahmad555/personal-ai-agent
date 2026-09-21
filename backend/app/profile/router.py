@@ -38,6 +38,7 @@ from app.profile.schemas import (
     WorkExperienceRead,
     WorkExperienceUpdate,
 )
+from app.profile.skills import record_skill_version
 
 router = APIRouter(prefix="/profile", tags=["profile"])
 
@@ -411,16 +412,8 @@ async def add_skill_version(
     if payload.work_experience_id is not None:
         await _get_owned_experience(db, payload.work_experience_id, profile.id)
 
-    version = SkillVersion(skill_id=skill.id, **payload.model_dump())
-    db.add(version)
-    await db.flush()
-
-    await sync_embedding(
-        db,
-        profile_id=profile.id,
-        owner_type="skill_evidence",
-        owner_id=version.id,
-        text=f"{skill.name} ({version.level}): {version.evidence}",
+    version = await record_skill_version(
+        db, profile_id=profile.id, skill=skill, **payload.model_dump()
     )
     await db.commit()
     await db.refresh(version)

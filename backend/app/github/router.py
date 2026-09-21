@@ -3,9 +3,9 @@ from typing import Annotated
 from urllib.parse import urlencode
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import RedirectResponse
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.audit.service import log_action
@@ -16,7 +16,12 @@ from app.db.base import get_db
 from app.db.models import User
 from app.github import oauth
 from app.github.client import GithubApiError, get_authenticated_user, list_installations
-from app.github.models import GithubConnection
+from app.github.models import (
+    GithubConnection,
+    GithubRepo,
+    GithubSkillProposal,
+    GithubSyncRun,
+)
 from app.github.schemas import ConnectionRead, DisconnectResult
 from app.github.service import write_permissions
 from app.gmail.crypto import decrypt_token, encrypt_token
@@ -163,7 +168,10 @@ async def _audit_failure(user_id: uuid.UUID, error: str) -> None:
 async def disconnect(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
+    purge_data: Annotated[bool, Query()] = False,
 ) -> DisconnectResult:
+    """Skills already added to the profile are the user's own and are never removed here; only
+    the synced snapshot, sync history and proposals are deleted when `purge_data` is set."""
     connection = await _get_connection(db, current_user.id)
 
     revoked = False
@@ -178,13 +186,16 @@ async def disconnect(
     connection.refresh_token_encrypted = None
     connection.token_expires_at = None
     connection.refresh_token_expires_at = None
+    if purge_data:
+        for model in (GithubRepo, GithubSkillProposal, GithubSyncRun):
+            await db.execute(delete(model).where(model.connection_id == connection.id))
     await log_action(
         db,
         user_id=current_user.id,
         action="github.disconnected",
         risk_level="green",
         summary=f"Disconnected GitHub account {connection.github_login}.",
-        evidence={"revoked_at_github": revoked},
+        evidence={"revoked_at_github": revoked, "purged_synced_data": purge_data},
         resource_type="github_connection",
         resource_id=connection.id,
     )

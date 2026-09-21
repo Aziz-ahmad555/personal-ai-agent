@@ -87,7 +87,9 @@ async def test_start_requires_auth_and_returns_a_github_url(
     response = await client.get("/github/oauth/start", headers=auth_headers)
 
     assert response.status_code == 200
-    assert response.json()["authorization_url"].startswith("https://github.com/login/oauth/authorize")
+    assert response.json()["authorization_url"].startswith(
+        "https://github.com/login/oauth/authorize"
+    )
 
 
 async def test_there_is_no_connection_before_connecting(
@@ -149,9 +151,7 @@ async def test_an_app_with_write_permissions_is_refused_and_its_token_revoked(
     user_id = await _user_id(session_factory)
     revoked = _fake_github(
         monkeypatch,
-        installations=[
-            {"id": 1, "account": "aziz-ahmad555", "permissions": {"contents": "write"}}
-        ],
+        installations=[{"id": 1, "account": "aziz-ahmad555", "permissions": {"contents": "write"}}],
     )
 
     response = await _callback(client, user_id)
@@ -170,9 +170,7 @@ async def test_read_only_installations_are_recorded(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     user_id = await _user_id(session_factory)
-    installations = [
-        {"id": 1, "account": "aziz-ahmad555", "permissions": {"metadata": "read"}}
-    ]
+    installations = [{"id": 1, "account": "aziz-ahmad555", "permissions": {"metadata": "read"}}]
     _fake_github(monkeypatch, installations=installations)
 
     await _callback(client, user_id)
@@ -242,8 +240,10 @@ async def test_reconnecting_updates_the_same_row_and_records_an_account_change(
     async with session_factory() as db:
         rows = (await db.execute(select(GithubConnection))).scalars().all()
         connected = (
-            await db.execute(select(AuditLog).where(AuditLog.action == "github.connected"))
-        ).scalars().all()
+            (await db.execute(select(AuditLog).where(AuditLog.action == "github.connected")))
+            .scalars()
+            .all()
+        )
     assert [row.github_login for row in rows] == ["second-account"]
     assert [entry.evidence["previous_login"] for entry in connected] == [None, "first-account"]
 
@@ -344,7 +344,10 @@ async def test_the_overview_requires_auth(client: AsyncClient) -> None:
 
 
 def test_no_route_exists_for_the_unavailable_platforms() -> None:
-    paths = [getattr(route, "path", "") for route in app.routes]
+    # app.routes wraps included routers, so the OpenAPI schema is the flat list of real paths.
+    paths = list(app.openapi()["paths"])
 
+    assert "/github/connection" in paths  # the list is real, so the absence below means something
+    assert "/integrations" in paths
     for platform in ("linkedin", "indeed", "fiverr"):
         assert not [path for path in paths if platform in path.lower()]
