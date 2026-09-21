@@ -108,3 +108,55 @@ class AcceptResult(BaseModel):
     proposal: ProposalRead
     skill_id: uuid.UUID
     skill_version_id: uuid.UUID
+
+
+CheckStatus = Literal["pass", "warn", "fail", "unknown"]
+
+
+class CheckRead(BaseModel):
+    key: str
+    label: str
+    status: CheckStatus
+    detail: str
+    evidence_url: str | None
+    fix: str | None
+
+
+class RepoReviewRead(BaseModel):
+    name: str
+    html_url: str
+    reviewed: bool
+    # Why a repo wasn't reviewed (a fork, archived, or its details couldn't be read).
+    reason: str | None
+    checks: list[CheckRead]
+    passed: int
+    total: int
+    unknown: int
+
+
+class FixRead(BaseModel):
+    repo: str | None
+    repo_url: str | None
+    check_key: str
+    label: str
+    status: Literal["warn", "fail"]
+    detail: str
+    fix: str
+    evidence_url: str | None
+
+
+class ReadinessRead(BaseModel):
+    # False until a sync has completed: there is nothing to review yet.
+    synced: bool
+    as_of: datetime | None
+    # True when some checks are unknown only because the last sync predates the data they need.
+    needs_resync: bool
+    repos: list[RepoReviewRead]
+    profile: list[CheckRead]
+    fixes: list[FixRead]
+    limitations: list[str]
+
+
+class ReadinessExport(BaseModel):
+    filename: str
+    text: str

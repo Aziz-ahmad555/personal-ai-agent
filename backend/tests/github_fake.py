@@ -28,7 +28,7 @@ def repo(rid: int, name: str, **overrides: object) -> dict:
         "name": name,
         "full_name": f"me/{name}",
         "html_url": f"https://github.com/me/{name}",
-        "description": f"{name} project",
+        "description": f"{name}: a project used in tests",
         "fork": False,
         "archived": False,
         "language": "Python",
@@ -75,8 +75,8 @@ class FakeGitHub:
 
     # --- canned scenarios ---------------------------------------------------------------
 
-    def user(self, login: str = "me") -> None:
-        self.routes["/user"] = ok({"login": login, "id": 1})
+    def user(self, login: str = "me", **profile: object) -> None:
+        self.routes["/user"] = ok({"login": login, "id": 1, **profile})
 
     def repos(self, *repos: dict, login: str = "me") -> None:
         path = f"/users/{login}/repos"
@@ -91,6 +91,7 @@ class FakeGitHub:
         files: dict[str, str] | None = None,
         newest: str = "2026-09-12T10:00:00Z",
         oldest: str = "2026-03-01T10:00:00Z",
+        readme: str | None = "# Project\n\nA short README.\n",
     ) -> None:
         """Everything a detail pass reads for one repo."""
         base = f"/repos/me/{name}"
@@ -107,7 +108,11 @@ class FakeGitHub:
             )
             self.routes[f"{commits_path}&page={commits}"] = ok([commit(oldest)])
         files = files or {}
-        tree = [{"path": "README.md", "type": "blob"}]
+        tree = [{"path": "README.md", "type": "blob"}] if readme is not None else []
+        if readme is not None:
+            self.routes[f"{base}/contents/README.md"] = ok(
+                {"encoding": "base64", "content": b64(readme), "size": len(readme)}
+            )
         for path in files:
             folder = path.rsplit("/", 1)[0] if "/" in path else None
             if folder and {"path": folder, "type": "tree"} not in tree:
@@ -125,8 +130,15 @@ class FakeGitHub:
         )
 
     def account(self) -> None:
-        """The standard account: two real projects, a notebook repo, a fork and an archive."""
-        self.user()
+        """The standard account: two real projects, a notebook repo, a fork and an archive. Like
+        the real one, AegisAI has no README and smart-campus-ai has a partial download committed."""
+        self.user(
+            name="Aziz Ahmad",
+            bio="ML engineer building vision systems",
+            location="Lahore",
+            blog="",
+            public_repos=3,
+        )
         self.repos(
             repo(1, "AegisAI"),
             repo(2, "smart-campus-ai", language="JavaScript", pushed_at="2026-08-31T10:00:00Z"),
@@ -142,6 +154,7 @@ class FakeGitHub:
                 "requirements.txt": "fastapi>=0.110\nsqlalchemy\nuvicorn\n",
                 "Dockerfile": "FROM python:3.12\n",
             },
+            readme=None,
         )
         self.project(
             "smart-campus-ai",
@@ -151,6 +164,7 @@ class FakeGitHub:
             files={
                 "frontend/package.json": json.dumps({"dependencies": {"react": "^19"}}),
                 "backend/requirements.txt": "fastapi\nnumpy\n",
+                ".yolov8n-pose.pt.38fb.part": "",
             },
         )
         self.project(

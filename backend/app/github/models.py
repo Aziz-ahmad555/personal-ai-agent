@@ -51,6 +51,10 @@ class GithubConnection(Base):
     # only public data is reachable — which is all this integration uses.
     installations: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list, nullable=False)
 
+    # The public profile fields (name, bio, location, website, ...) from the last sync. None
+    # means a sync from before these were recorded.
+    profile_facts: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+
     status: Mapped[str] = mapped_column(String(20), default="connected", nullable=False)
     last_error: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(
@@ -94,6 +98,12 @@ class GithubRepo(Base):
     # File and folder names in the repo root, kept so the readiness review can use them later.
     root_files: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
     dependencies: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list, nullable=False)
+    # For the readiness review. None means "never collected" (a sync from before these existed),
+    # which the review reports as unknown rather than as missing.
+    tree_truncated: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    notable_paths: Mapped[dict[str, list[str]] | None] = mapped_column(JSON)
+    # README structure only (word count, headings, code blocks, images), never its text.
+    readme: Mapped[dict[str, Any] | None] = mapped_column(JSON)
     # Commits GitHub attributes to the connected account. None: not looked up (different from 0).
     authored_commits: Mapped[int | None] = mapped_column(Integer)
     first_commit_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

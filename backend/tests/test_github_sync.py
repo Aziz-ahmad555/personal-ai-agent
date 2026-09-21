@@ -379,7 +379,10 @@ async def test_a_sync_snapshots_repos_and_reads_details_only_for_your_own_active
     assert aegis.languages == {"Python": 114_846, "HTML": 62_339}
     assert aegis.authored_commits == 43
     assert aegis.first_commit_at.year == 2026 and aegis.last_commit_at.month == 9  # type: ignore[union-attr]
-    assert sorted(aegis.root_files) == ["Dockerfile", "README.md", "requirements.txt"]
+    assert sorted(aegis.root_files) == [
+        "Dockerfile",
+        "requirements.txt",
+    ]  # no README, like the real repo
     assert {d["skill"] for d in aegis.dependencies} == {"FastAPI", "SQLAlchemy"}
     assert repos["plant-disease-classifier"].authored_commits == 0  # looked up: none attributed
     assert repos["someone-elses-project"].details_fetched is False
@@ -450,6 +453,88 @@ async def test_a_truncated_file_list_is_reported_rather_than_hidden(
 
     assert run.status == "completed"
     assert any("AegisAI" in w and "cut off its file list" in w for w in run.warnings)
+
+
+async def test_a_sync_records_what_the_readiness_review_needs_without_keeping_readme_text(
+    session_factory: async_sessionmaker[AsyncSession], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fake = FakeGitHub()
+    fake.account()
+    fake.project(
+        "smart-campus-ai",
+        languages={"JavaScript": 78_123},
+        commits=29,
+        readme=("# Campus\n\nSecret marketing prose that must not be stored.\n\n## Installation\n"),
+        files={
+            ".yolov8n-pose.pt.38fb.part": "",
+            "tests/test_a.py": "x",
+            ".github/workflows/ci.yml": "x",
+        },
+    )
+    connection = await _connection(session_factory)
+
+    await _run(session_factory, fake, monkeypatch, connection)
+
+    async with session_factory() as db:
+        repos = {r.name: r for r in (await db.execute(select(GithubRepo))).scalars().all()}
+        stored = await db.get(GithubConnection, connection.id)
+    aegis, campus = repos["AegisAI"], repos["smart-campus-ai"]
+    assert aegis.readme == {"present": False}
+    assert campus.readme["present"] is True and campus.readme["structured"] is True  # type: ignore[index]
+    assert campus.readme["has_setup_section"] is True  # type: ignore[index]
+    assert "marketing prose" not in str(campus.readme)  # structure only, never the text
+    assert campus.notable_paths == {
+        "tests": ["tests/test_a.py"],
+        "ci": [".github/workflows/ci.yml"],
+        "secrets": [],
+        "junk": [".yolov8n-pose.pt.38fb.part"],
+    }
+    assert campus.tree_truncated is False
+    assert repos["someone-elses-project"].notable_paths is None  # forks aren't read at all
+    assert stored.profile_facts == {  # type: ignore[union-attr]
+        "login": "me",
+        "name": "Aziz Ahmad",
+        "bio": "ML engineer building vision systems",
+        "company": None,
+        "location": "Lahore",
+        "blog": "",
+        "public_repos": 3,
+        "followers": None,
+        "created_at": None,
+        "hireable": None,
+    }
+
+
+async def test_the_profile_facts_come_from_the_user_call_with_no_extra_request(
+    session_factory: async_sessionmaker[AsyncSession], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fake = FakeGitHub()
+    fake.account()
+
+    await _run(session_factory, fake, monkeypatch, await _connection(session_factory))
+
+    assert fake.requests.count("/user") == 1
+    assert not [r for r in fake.requests if r == "/users/me"]
+
+
+async def test_an_unreadable_readme_is_recorded_as_unreadable_not_as_missing(
+    session_factory: async_sessionmaker[AsyncSession], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fake = FakeGitHub()
+    fake.account()
+    fake.routes["/repos/me/smart-campus-ai/contents/README.md"] = ok(
+        {"encoding": "base64", "content": "/w==", "size": 1}  # 0xFF is not UTF-8
+    )
+
+    await _run(session_factory, fake, monkeypatch, await _connection(session_factory))
+
+    async with session_factory() as db:
+        campus = (
+            await db.execute(select(GithubRepo).where(GithubRepo.name == "smart-campus-ai"))
+        ).scalar_one()
+    assert campus.readme["present"] is True  # type: ignore[index]
+    assert campus.readme["readable"] is False  # type: ignore[index]
+    assert "couldn't be read" in campus.readme["reason"]  # type: ignore[index]
 
 
 async def test_a_sync_summarizes_recent_activity_and_says_how_far_back_it_sees(

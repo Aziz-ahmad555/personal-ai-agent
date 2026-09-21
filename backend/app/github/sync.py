@@ -14,6 +14,7 @@ from sqlalchemy.orm import selectinload
 from app.audit.service import log_action
 from app.career.matching import normalize_skill
 from app.github import client as gh
+from app.github import readiness
 from app.github.catalog import dependency_skills, is_manifest
 from app.github.derive import (
     DependencyFact,
@@ -215,6 +216,8 @@ async def _sync(
         raise gh.GithubApiError("GitHub's user response was missing a login.")
     if account["login"] != connection.github_login:
         connection.github_login = account["login"]
+    # Public profile fields for the readiness review (already in this response: no extra request).
+    connection.profile_facts = {key: account.get(key) for key in PROFILE_FIELDS}
     login = connection.github_login
 
     listed = await gh.list_owned_public_repos(http, login)
@@ -363,6 +366,39 @@ def manifest_paths(entries: list[gh.TreeEntry]) -> list[str]:
     return sorted(found, key=lambda path: (path.count("/"), path))[:MAX_MANIFESTS_PER_REPO]
 
 
+PROFILE_FIELDS = (
+    "login",
+    "name",
+    "bio",
+    "company",
+    "location",
+    "blog",
+    "public_repos",
+    "followers",
+    "created_at",
+    "hireable",
+)
+
+
+async def _read_readme(
+    http: gh.GithubHttp, row: GithubRepo, root_names: list[str]
+) -> dict[str, Any]:
+    """The README's structure (never its text), or a note that there isn't one or it couldn't be
+    read. Missing and unreadable are different answers and the review treats them differently."""
+    path = readiness.readme_candidate(root_names)
+    if path is None:
+        return {"present": False}
+    text = await gh.get_text_file(http, row.full_name, path)
+    if text is None:
+        return {
+            "path": path,
+            "present": True,
+            "readable": False,
+            "reason": "couldn't be read (it may be too large or not plain text).",
+        }
+    return readiness.readme_metrics(text, path)
+
+
 async def _fetch_details(http: gh.GithubHttp, row: GithubRepo, login: str) -> list[str]:
     """All of a repo's detail or none of it: values are assigned only after every request worked,
     so a half-read repo never masquerades as a fully read one. Returns any warnings."""
@@ -385,11 +421,16 @@ async def _fetch_details(http: gh.GithubHttp, row: GithubRepo, login: str) -> li
         for skill in dependency_skills(path.rsplit("/", 1)[-1], text):
             dependencies.append({"skill": skill, "file": path, "url": url})
 
+    root_names = [e.path for e in entries if "/" not in e.path]
+    row.readme = await _read_readme(http, row, root_names)
+    row.notable_paths = readiness.notable_paths([(e.path, e.type) for e in entries])
+    row.tree_truncated = truncated
+
     row.languages = languages
     row.authored_commits = stats.count
     row.first_commit_at = _parse_dt(stats.first_at)
     row.last_commit_at = _parse_dt(stats.last_at)
-    row.root_files = [e.path for e in entries if "/" not in e.path]
+    row.root_files = root_names
     row.dependencies = dependencies
     row.details_fetched = True
     return warnings
