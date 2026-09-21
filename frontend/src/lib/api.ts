@@ -942,3 +942,118 @@ export const resumesApi = {
     })
   },
 }
+
+// --- Career: cover letters ---
+
+export type CoverRole = 'opening' | 'body' | 'closing'
+export type CoverSupportType =
+  | 'profile_experience'
+  | 'profile_skill'
+  | 'profile_summary'
+  | 'posting_quote'
+
+/** What a sentence was checked against: a role, an evidence-backed skill, the summary, or a
+ * verbatim excerpt from the posting. */
+export interface CoverSupport {
+  type: CoverSupportType
+  ref: string
+  label: string
+  excerpt: string
+}
+
+export interface CoverSentence {
+  text: string
+  /** "fact" was checked against its supports; "framing" carries no facts at all. */
+  kind: 'fact' | 'framing'
+  supports: CoverSupport[]
+}
+
+export interface CoverParagraph {
+  id: string
+  position: number
+  role: CoverRole
+  /** The fact-checked original. */
+  text: string
+  /** The user's own rewrite, if any — their words, so NOT fact-checked. */
+  edited_text: string | null
+  is_edited: boolean
+  sentences: CoverSentence[]
+  decision: ResumeDecision
+}
+
+/** A sentence discarded because the profile or posting didn't support it. */
+export interface CoverDropped {
+  sentence: string
+  reason: string
+}
+
+export interface CoverLetter {
+  id: string
+  job_posting_id: string
+  status: ResumeStatus
+  error: string | null
+  is_stale: boolean
+  started_at: string
+  paragraphs: CoverParagraph[]
+  gaps: ResumeGap[]
+  dropped: CoverDropped[]
+  counts: { accepted: number; rejected: number; pending: number }
+  /** The letter as it stands: accepted paragraphs only, using the user's edit where present. */
+  preview_text: string
+}
+
+export interface CoverExport {
+  filename: string
+  text: string
+  accepted: number
+  pending: number
+  rejected: number
+  /** How many included paragraphs are the user's own wording, and so not fact-checked. */
+  edited: number
+}
+
+export const coversApi = {
+  /** null when no draft exists yet (a 404 here is the normal "not started" state). */
+  async get(token: string, jobId: string): Promise<CoverLetter | null> {
+    try {
+      return await apiFetch<CoverLetter>(`/career/jobs/${jobId}/cover-letter`, {
+        headers: authHeaders(token),
+      })
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 404) return null
+      throw error
+    }
+  },
+  draft(token: string, jobId: string) {
+    return apiFetch<{ status: string }>(`/career/jobs/${jobId}/cover-letter`, {
+      method: 'POST',
+      headers: authHeaders(token),
+    })
+  },
+  decide(token: string, letterId: string, paragraphId: string, decision: ResumeDecision) {
+    return apiFetch<CoverLetter>(`/career/cover-letters/${letterId}/paragraphs/${paragraphId}/decision`, {
+      method: 'POST',
+      headers: authHeaders(token),
+      body: JSON.stringify({ decision }),
+    })
+  },
+  /** text = null restores the fact-checked original. */
+  edit(token: string, letterId: string, paragraphId: string, text: string | null) {
+    return apiFetch<CoverLetter>(`/career/cover-letters/${letterId}/paragraphs/${paragraphId}`, {
+      method: 'PATCH',
+      headers: authHeaders(token),
+      body: JSON.stringify({ text }),
+    })
+  },
+  export(token: string, letterId: string) {
+    return apiFetch<CoverExport>(`/career/cover-letters/${letterId}/export`, {
+      headers: authHeaders(token),
+    })
+  },
+  delete(token: string, letterId: string) {
+    return apiFetch<void>(`/career/cover-letters/${letterId}`, {
+      method: 'DELETE',
+      headers: authHeaders(token),
+    })
+  },
+}

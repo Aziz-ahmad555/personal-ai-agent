@@ -10,6 +10,7 @@ import { ApplicationStatusBadge } from '@/features/applications/badges'
 import { useApplications, useTrackJob } from '@/features/applications/hooks'
 import { useMatchJob, useVerifyJob, useVerifyingJobIds } from '@/features/career/hooks'
 import { MatchPanel } from '@/features/career/MatchPanel'
+import { CoverPanel } from '@/features/cover/CoverPanel'
 import { TailorPanel } from '@/features/resume/TailorPanel'
 
 function formatSalary(job: CareerJob): string | null {
@@ -214,6 +215,8 @@ export function JobDetail({ job }: JobDetailProps) {
       )}
 
       <TailorPanel job={job} />
+
+      <CoverPanel job={job} />
 
       <VerificationSection job={job} isVerifying={verifyingIds.has(job.id)} />
     </div>
