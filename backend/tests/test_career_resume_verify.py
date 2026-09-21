@@ -173,3 +173,11 @@ def test_gaps_separate_unevidenced_from_absent_and_skip_covered_skills() -> None
         {"skill": "Rust", "kind": "required", "reason": "it isn't in your profile"},
         {"skill": "Kubernetes", "kind": "preferred", "reason": "it isn't in your profile"},
     ]
+
+
+def test_a_plural_of_a_word_the_profile_holds_is_not_a_new_name() -> None:
+    # Found running against a real profile: "Gustafson's Law" reworded as "Gustafson's Laws".
+    held = {"law", "amdahl", "gustafson"}
+
+    assert novel_terms("Analyzed speedup with Amdahl's and Gustafson's Laws.", held) == []
+    assert novel_terms("Analyzed speedup with Amdahl's and Gustafson's Rules.", held) == ["Rules"]

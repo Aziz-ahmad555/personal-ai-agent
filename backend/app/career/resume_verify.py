@@ -52,12 +52,23 @@ def _proper_looking(word: str, is_sentence_start: bool) -> bool:
     return word[0].isupper() and not is_sentence_start  # a name in mid-sentence: Kubernetes
 
 
+def _stem(word: str) -> str:
+    """Crude plural folding, so "Laws" isn't mistaken for a new name when the profile says "Law"."""
+    lowered = word.lower()
+    return lowered[:-1] if lowered.endswith("s") and len(lowered) > 3 else lowered
+
+
 def novel_terms(new_text: str, allowed_words: set[str]) -> list[str]:
     """Proper-looking words in `new_text` that aren't among the words the profile holds."""
+    allowed_stems = {_stem(w) for w in allowed_words}
     found: list[str] = []
     for sentence in _SENTENCE_SPLIT_RE.split(new_text):
         for index, word in enumerate(_WORD_RE.findall(sentence)):
-            if _proper_looking(word, index == 0) and word.lower() not in allowed_words:
+            if (
+                _proper_looking(word, index == 0)
+                and word.lower() not in allowed_words
+                and _stem(word) not in allowed_stems
+            ):
                 if word not in found:
                     found.append(word)
     return found
