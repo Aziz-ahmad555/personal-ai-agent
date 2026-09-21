@@ -70,7 +70,13 @@ describe('LandingPage without WebGL', () => {
     renderLanding()
     const names = LADDER.tiers.map((tier) => tier.name)
 
-    expect(names).toEqual(['Official', 'Government', 'Documentation', 'Reputable secondary', 'Forums, as anecdote'])
+    expect(names).toEqual([
+      'Official sources',
+      'Government sources',
+      'Technical documentation',
+      'Reputable secondary coverage',
+      'Forums and social platforms',
+    ])
     for (const name of names) expect(screen.getByText(name)).toBeInTheDocument()
     for (const note of [
       "The employer's own domain, primary documents, and direct postings.",

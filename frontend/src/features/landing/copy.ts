@@ -32,11 +32,11 @@ export const LADDER = {
   intro:
     'Sources are ranked before they are read. A claim backed by an official page outweighs a dozen forum posts, and forum posts are only ever treated as anecdote.',
   tiers: [
-    { name: 'Official', note: "The employer's own domain, primary documents, and direct postings." },
-    { name: 'Government', note: 'Regulatory filings, court records, and official registries.' },
-    { name: 'Documentation', note: 'Authoritative vendor and technical references.' },
-    { name: 'Reputable secondary', note: 'Outlets with real editorial standards, used to corroborate — not originate — a claim.' },
-    { name: 'Forums, as anecdote', note: 'Anecdotal color only. Never the sole basis for a fact.' },
+    { name: 'Official sources', note: "The employer's own domain, primary documents, and direct postings." },
+    { name: 'Government sources', note: 'Regulatory filings, court records, and official registries.' },
+    { name: 'Technical documentation', note: 'Authoritative vendor and technical references.' },
+    { name: 'Reputable secondary coverage', note: 'Outlets with real editorial standards, used to corroborate — not originate — a claim.' },
+    { name: 'Forums and social platforms', note: 'Anecdotal color only. Never the sole basis for a fact.' },
   ],
 } as const
 
