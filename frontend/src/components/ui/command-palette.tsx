@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Command } from 'cmdk'
 import { useNavigate } from 'react-router-dom'
-import { LayoutDashboard, LogOut, Mail, Moon, Search, Sun, User } from 'lucide-react'
+import { Briefcase, LayoutDashboard, LogOut, Mail, Moon, Search, Sun, User } from 'lucide-react'
 import { useAuthStore } from '@/stores/auth'
 import { useThemeStore } from '@/stores/theme'
 
@@ -75,6 +75,9 @@ export function CommandPalette() {
         </Command.Item>
         <Command.Item onSelect={() => run(() => navigate('/gmail'))} className={ITEM_CLASS}>
           <Mail className="h-4 w-4" /> Go to Gmail
+        </Command.Item>
+        <Command.Item onSelect={() => run(() => navigate('/career'))} className={ITEM_CLASS}>
+          <Briefcase className="h-4 w-4" /> Go to career
         </Command.Item>
         <Command.Item onSelect={() => run(toggleTheme)} className={ITEM_CLASS}>
           {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}

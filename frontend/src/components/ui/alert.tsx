@@ -9,6 +9,9 @@ const alertVariants = cva(
       variant: {
         default: 'border-border bg-card text-card-foreground',
         destructive: 'border-destructive/50 bg-destructive/10 text-destructive',
+        // For "proceed with care" notices that aren't errors — e.g. a score that rests on
+        // too little evidence. Heavier left rule so it can't be skimmed past.
+        warning: 'border-warning/60 border-l-4 bg-warning/10 text-warning-foreground',
       },
     },
     defaultVariants: { variant: 'default' },

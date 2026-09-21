@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { FolderSearch, Search } from 'lucide-react'
+import { Briefcase, FolderSearch, Search } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ErrorState } from '@/components/layout/error-state'
@@ -64,6 +64,18 @@ export function DashboardPage() {
             <p className="text-sm font-medium">Search</p>
             <p className="text-sm text-muted-foreground">
               Semantic search across your profile and past research.
+            </p>
+          </div>
+        </Link>
+        <Link
+          to="/career"
+          className="flex items-start gap-3 rounded-lg border border-border p-4 transition-colors hover:bg-accent"
+        >
+          <Briefcase className="h-5 w-5 shrink-0 text-muted-foreground" />
+          <div>
+            <p className="text-sm font-medium">Career</p>
+            <p className="text-sm text-muted-foreground">
+              Add job postings and see how well each fits you, with the evidence.
             </p>
           </div>
         </Link>

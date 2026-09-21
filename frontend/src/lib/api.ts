@@ -483,3 +483,166 @@ export const profileApi = {
     })
   },
 }
+
+// --- Career: jobs, verification, fraud, match ---
+
+export type RemoteType = 'remote' | 'hybrid' | 'onsite' | 'unknown'
+export type JobBoard = 'greenhouse' | 'lever' | 'ashby' | 'usajobs'
+export type EmployerVerificationStatus = 'verified' | 'unconfirmed' | 'suspicious'
+export type FraudRiskLevel = 'low' | 'medium' | 'high'
+export type MatchStatus = 'running' | 'completed' | 'failed'
+export type ComponentStatus = 'assessed' | 'not_assessed'
+export type DealBreakerCheck = 'none_set' | 'checked' | 'unavailable'
+
+export interface EmployerVerification {
+  id: string
+  employer_key: string
+  verification_status: EmployerVerificationStatus
+  confidence_score: number
+  rationale: string
+  checked_at: string
+}
+
+export interface FraudSignal {
+  code: string
+  description: string
+}
+
+export interface FraudAssessment {
+  id: string
+  risk_level: FraudRiskLevel
+  risk_score: number
+  signals: FraudSignal[]
+  assessed_at: string
+}
+
+/** One line of a component's evidence. Which keys are present depends on the component
+ * (skills carry requirement/quote/match_type/evidence; salary carries the two numbers, ...),
+ * so it's deliberately loose — the UI renders the ones it knows and ignores the rest. */
+export type MatchDetail = Record<string, unknown>
+
+export interface MatchComponent {
+  key: string
+  label: string
+  weight: number
+  status: ComponentStatus
+  fraction: number | null
+  points: number | null
+  summary: string
+  reason: string | null
+  details: MatchDetail[]
+}
+
+export interface DealBreakerHit {
+  deal_breaker: string
+  quote: string
+}
+
+export interface JobMatch {
+  id: string
+  status: MatchStatus
+  error: string | null
+  /** null (never 0) when nothing could be assessed. */
+  score_percent: number | null
+  /** Of the 100 points, how many were actually measurable. */
+  assessed_weight: number
+  low_confidence: boolean
+  components: MatchComponent[]
+  uncertainties: string[]
+  deal_breaker_check: DealBreakerCheck
+  deal_breaker_hits: DealBreakerHit[]
+  /** The profile changed after this was computed. */
+  is_stale: boolean
+  computed_at: string
+}
+
+export interface CareerJob {
+  id: string
+  source_channel: string
+  external_id: string | null
+  source_url: string | null
+  company_name: string | null
+  company_domain: string | null
+  title: string | null
+  location: string | null
+  remote_type: RemoteType
+  salary_min: number | null
+  salary_max: number | null
+  salary_currency: string | null
+  description_text: string | null
+  posted_at: string | null
+  discovered_at: string
+  employer_verification: EmployerVerification | null
+  fraud_assessment: FraudAssessment | null
+  match: JobMatch | null
+}
+
+export interface JobBoardFeed {
+  id: string
+  board: JobBoard
+  company_slug: string | null
+  keyword: string | null
+  is_active: boolean
+  last_polled_at: string | null
+  last_poll_error: string | null
+}
+
+export interface JobBoardFeedInput {
+  board: JobBoard
+  company_slug?: string | null
+  keyword?: string | null
+}
+
+export const careerApi = {
+  listJobs(token: string) {
+    return apiFetch<CareerJob[]>('/career/jobs', { headers: authHeaders(token) })
+  },
+  createFromUrl(token: string, url: string) {
+    return apiFetch<CareerJob>('/career/jobs/from-url', {
+      method: 'POST',
+      headers: authHeaders(token),
+      body: JSON.stringify({ url }),
+    })
+  },
+  createFromPaste(token: string, rawText: string) {
+    return apiFetch<CareerJob>('/career/jobs/paste', {
+      method: 'POST',
+      headers: authHeaders(token),
+      body: JSON.stringify({ raw_text: rawText }),
+    })
+  },
+  matchJob(token: string, id: string) {
+    return apiFetch<{ status: string }>(`/career/jobs/${id}/match`, {
+      method: 'POST',
+      headers: authHeaders(token),
+    })
+  },
+  verifyJob(token: string, id: string) {
+    return apiFetch<{ status: string }>(`/career/jobs/${id}/verify`, {
+      method: 'POST',
+      headers: authHeaders(token),
+    })
+  },
+  listFeeds(token: string) {
+    return apiFetch<JobBoardFeed[]>('/career/jobs/feeds', { headers: authHeaders(token) })
+  },
+  createFeed(token: string, input: JobBoardFeedInput) {
+    return apiFetch<JobBoardFeed>('/career/jobs/feeds', {
+      method: 'POST',
+      headers: authHeaders(token),
+      body: JSON.stringify(input),
+    })
+  },
+  deleteFeed(token: string, id: string) {
+    return apiFetch<void>(`/career/jobs/feeds/${id}`, {
+      method: 'DELETE',
+      headers: authHeaders(token),
+    })
+  },
+  pollFeed(token: string, id: string) {
+    return apiFetch<{ status: string }>(`/career/jobs/feeds/${id}/poll`, {
+      method: 'POST',
+      headers: authHeaders(token),
+    })
+  },
+}

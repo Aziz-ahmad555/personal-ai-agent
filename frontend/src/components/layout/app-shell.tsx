@@ -13,6 +13,7 @@ const NAV_ITEMS = [
   { to: '/research', label: 'Research' },
   { to: '/search', label: 'Search' },
   { to: '/gmail', label: 'Gmail' },
+  { to: '/career', label: 'Career' },
 ]
 
 export function AppShell() {

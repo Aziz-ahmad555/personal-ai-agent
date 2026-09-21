@@ -7,6 +7,7 @@ import { ProfilePage } from '@/pages/profile'
 import { ResearchPage } from '@/pages/research'
 import { SearchPage } from '@/pages/search'
 import { GmailPage } from '@/pages/gmail'
+import { CareerPage } from '@/pages/career'
 
 export const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
@@ -23,6 +24,7 @@ export const router = createBrowserRouter([
       { path: 'research', element: <ResearchPage /> },
       { path: 'search', element: <SearchPage /> },
       { path: 'gmail', element: <GmailPage /> },
+      { path: 'career', element: <CareerPage /> },
     ],
   },
 ])

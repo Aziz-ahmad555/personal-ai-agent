@@ -20,6 +20,8 @@
   --border: 240 6% 90%;
   --input: 240 6% 90%;
   --ring: 240 6% 10%;
+  --warning: 38 92% 50%;
+  --warning-foreground: 32 90% 28%;
   --radius: 0.625rem;
 }
 
@@ -41,6 +43,8 @@
   --border: 240 5% 18%;
   --input: 240 5% 18%;
   --ring: 240 5% 65%;
+  --warning: 38 92% 55%;
+  --warning-foreground: 38 92% 68%;
 }
 
 @theme inline {
@@ -61,6 +65,8 @@
   --color-border: hsl(var(--border));
   --color-input: hsl(var(--input));
   --color-ring: hsl(var(--ring));
+  --color-warning: hsl(var(--warning));
+  --color-warning-foreground: hsl(var(--warning-foreground));
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 2px);
   --radius-sm: calc(var(--radius) - 4px);
