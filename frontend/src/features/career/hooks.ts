@@ -52,7 +52,9 @@ export function useVerifyingJobIds(): Set<string> {
     staleTime: Infinity,
     initialData: {},
   })
-  const { data: jobs } = useQuery<CareerJob[]>({ queryKey: JOBS_KEY, enabled: false })
+  // The real jobs query (same key, same fetcher), not a second observer with different
+  // options: two observers configured differently on one query can leave it with no queryFn.
+  const { data: jobs } = useJobs()
   return new Set((jobs ?? []).filter((job) => isVerifying(job, markers)).map((j) => j.id))
 }
 
