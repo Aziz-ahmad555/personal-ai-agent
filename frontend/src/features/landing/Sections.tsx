@@ -78,10 +78,8 @@ export function EvidenceSection() {
                 <li key={line}>{line}</li>
               ))}
             </ul>
-            <p className="lp-stamp">
-              {EVIDENCE.verifiedAtLabel} <span className="lp-mono">{EVIDENCE.verifiedAt}</span>
-            </p>
             <p className="lp-uncertainty">{EVIDENCE.uncertainty}</p>
+            <p className="lp-stamp lp-mono">{EVIDENCE.source}</p>
           </article>
         </div>
       </div>
@@ -144,7 +142,6 @@ export function RiskSection() {
               <article key={tier.name} className="lp-risk-tier" data-active={i === active}>
                 <h3 className="lp-display" style={{ color: RISK_COLORS[i] }}>
                   {tier.name}
-                  <span> — {tier.summary}</span>
                 </h3>
                 <p>{tier.detail}</p>
               </article>

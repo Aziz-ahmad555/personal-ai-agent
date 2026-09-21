@@ -266,9 +266,10 @@
   background: var(--l-teal);
 }
 .lp-stamp {
-  margin: 0 0 14px;
-  font-size: 0.85rem;
+  margin: 14px 0 0;
+  font-size: 0.8rem;
   color: var(--l-muted);
+  overflow-wrap: anywhere;
 }
 .lp-uncertainty {
   margin: 0;

@@ -2,7 +2,7 @@ import { MemoryRouter } from 'react-router-dom'
 import { render, screen, within } from '@testing-library/react'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import LandingPage from '@/features/landing/LandingPage'
-import { EVIDENCE, HERO, LADDER, RISK } from '@/features/landing/copy'
+import { EVIDENCE, HERO, LADDER } from '@/features/landing/copy'
 import { useAuthStore } from '@/stores/auth'
 
 // jsdom cannot create a WebGL context, so this exercises the real fallback path end to end.
@@ -44,7 +44,11 @@ describe('LandingPage without WebGL', () => {
     renderLanding()
 
     expect(screen.getByRole('heading', { level: 1, name: HERO.headline })).toBeInTheDocument()
-    expect(screen.getByText(HERO.subhead)).toBeInTheDocument()
+    expect(
+      screen.getByText(
+        "Personal AI Agent researches your job leads, verifies employers, and scores every match against real evidence — before any of it reaches you. When it can't confirm something, it says so."
+      )
+    ).toBeInTheDocument()
   })
 
   it('shows the evidence card as an example, with its score, reasons and uncertainty', () => {
@@ -54,7 +58,12 @@ describe('LandingPage without WebGL', () => {
     expect(within(card).getByText(EVIDENCE.exampleLabel)).toBeInTheDocument()
     expect(within(card).getByText('87%')).toBeInTheDocument()
     expect(within(card).getByText(EVIDENCE.scoreLabel)).toBeInTheDocument()
-    expect(within(card).getByText(EVIDENCE.uncertainty)).toBeInTheDocument()
+    expect(within(card).getByText('Required skills present — Python, PyTorch, computer vision')).toBeInTheDocument()
+    expect(within(card).getByText('Employer verified — official source, checked 2 hours ago')).toBeInTheDocument()
+    expect(within(card).getByText('One uncertainty — salary range not published')).toBeInTheDocument()
+    expect(
+      within(card).getByText('source: careers.employer.com · fetched 2h ago · tier: official')
+    ).toBeInTheDocument()
   })
 
   it('lists the five source tiers from official down to forums', () => {
@@ -63,15 +72,26 @@ describe('LandingPage without WebGL', () => {
 
     expect(names).toEqual(['Official', 'Government', 'Documentation', 'Reputable secondary', 'Forums, as anecdote'])
     for (const name of names) expect(screen.getByText(name)).toBeInTheDocument()
+    for (const note of [
+      "The employer's own domain, primary documents, and direct postings.",
+      'Regulatory filings, court records, and official registries.',
+      'Authoritative vendor and technical references.',
+      'Outlets with real editorial standards, used to corroborate — not originate — a claim.',
+      'Anecdotal color only. Never the sole basis for a fact.',
+    ])
+      expect(screen.getByText(note)).toBeInTheDocument()
   })
 
   it('explains all three risk levels', () => {
     renderLanding()
 
-    for (const tier of RISK.tiers) {
-      expect(screen.getByRole('heading', { level: 3, name: new RegExp(tier.name) })).toBeInTheDocument()
-      expect(screen.getByText(tier.detail)).toBeInTheDocument()
-    }
+    for (const name of ['Green', 'Yellow', 'Red'])
+      expect(screen.getByRole('heading', { level: 3, name })).toBeInTheDocument()
+    expect(screen.getByText('Reads and analyzes. Runs on its own — nothing leaves your data.')).toBeInTheDocument()
+    expect(screen.getByText('Drafts something real, like a reply or a post. Waits for you to approve it.')).toBeInTheDocument()
+    expect(
+      screen.getByText('Sends, applies, or commits to something. Needs your approval and a second check.')
+    ).toBeInTheDocument()
   })
 
   it('offers sign-in to a visitor who is not logged in', () => {

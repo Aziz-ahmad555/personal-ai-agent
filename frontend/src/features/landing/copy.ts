@@ -1,12 +1,12 @@
 /**
- * All landing-page text lives here so it can be swapped against the design prototype in one place.
- * Lines marked [spec] are verbatim from the brief; the rest is drafted in the same voice and is
- * pending comparison with the prototype.
+ * All landing-page text lives here so it can be changed in one place. The hero subhead, evidence
+ * card, tier descriptions and risk descriptions are verbatim from the supplied copy. Section
+ * headings and intro paragraphs were not supplied and are still drafted in the same voice.
  */
 export const HERO = {
   headline: "It doesn't guess. It checks.", // [spec]
   subhead:
-    'It researches, verifies and scores every claim before anything reaches you, and when it cannot confirm something, it says so.',
+    "Personal AI Agent researches your job leads, verifies employers, and scores every match against real evidence — before any of it reaches you. When it can't confirm something, it says so.",
   signedOut: { label: 'Sign in', to: '/login' },
   signedIn: { label: 'Open the app', to: '/dashboard' },
 }
@@ -20,12 +20,11 @@ export const EVIDENCE = {
   score: 87, // [spec]
   scoreLabel: 'of what could be measured', // [spec]
   checks: [
-    'Required skills: Python, PyTorch and computer vision are present in the profile.',
-    "Employer verified: the posting was confirmed from the employer's own source.",
+    'Required skills present — Python, PyTorch, computer vision',
+    'Employer verified — official source, checked 2 hours ago',
   ],
-  verifiedAt: '2 hours ago',
-  verifiedAtLabel: 'Verified',
-  uncertainty: "One uncertainty: the salary isn't published.", // [spec]
+  uncertainty: 'One uncertainty — salary range not published',
+  source: 'source: careers.employer.com · fetched 2h ago · tier: official',
 }
 
 export const LADDER = {
@@ -33,11 +32,11 @@ export const LADDER = {
   intro:
     'Sources are ranked before they are read. A claim backed by an official page outweighs a dozen forum posts, and forum posts are only ever treated as anecdote.',
   tiers: [
-    { name: 'Official', note: 'The organisation itself, speaking about itself.' },
-    { name: 'Government', note: 'Registries, regulators and public records.' },
-    { name: 'Documentation', note: 'Product, standards and technical documentation.' },
-    { name: 'Reputable secondary', note: 'Established outlets that cite their own sources.' },
-    { name: 'Forums, as anecdote', note: 'Useful for leads. Never used as proof.' },
+    { name: 'Official', note: "The employer's own domain, primary documents, and direct postings." },
+    { name: 'Government', note: 'Regulatory filings, court records, and official registries.' },
+    { name: 'Documentation', note: 'Authoritative vendor and technical references.' },
+    { name: 'Reputable secondary', note: 'Outlets with real editorial standards, used to corroborate — not originate — a claim.' },
+    { name: 'Forums, as anecdote', note: 'Anecdotal color only. Never the sole basis for a fact.' },
   ],
 } as const
 
@@ -45,21 +44,9 @@ export const RISK = {
   heading: 'Every action has a risk level.',
   intro: 'The agent never decides how much authority it has. The level does, and the level is fixed in code.',
   tiers: [
-    {
-      name: 'Green',
-      summary: 'Automatic',
-      detail: 'Safe, reversible work such as reading, drafting and saving notes locally. Nothing leaves your machine.',
-    },
-    {
-      name: 'Yellow',
-      summary: 'You confirm',
-      detail: 'Anything sent outside, like an email, a post or an application. You read it and approve it first.',
-    },
-    {
-      name: 'Red',
-      summary: 'You confirm, then a second check',
-      detail: 'High-stakes actions need your explicit confirmation and a second, independent check.',
-    },
+    { name: 'Green', detail: 'Reads and analyzes. Runs on its own — nothing leaves your data.' },
+    { name: 'Yellow', detail: 'Drafts something real, like a reply or a post. Waits for you to approve it.' },
+    { name: 'Red', detail: 'Sends, applies, or commits to something. Needs your approval and a second check.' },
   ],
 } as const
 
