@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { AlertTriangle, Copy, Download, HelpCircle, RefreshCw, ShieldCheck } from 'lucide-react'
+import { AlertTriangle, Copy, Download, HelpCircle, RefreshCw, ShieldCheck, Trash2 } from 'lucide-react'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -10,6 +10,7 @@ interface TailorResultsProps {
   resume: TailoredResume
   onDecide: (changeId: string, decision: ResumeDecision) => void
   onRegenerate: () => void
+  onDelete: () => void
   onCopy: () => void
   onDownload: () => void
   isBusy: boolean
@@ -23,12 +24,13 @@ export function TailorResults({
   resume,
   onDecide,
   onRegenerate,
+  onDelete,
   onCopy,
   onDownload,
   isBusy,
   notice,
 }: TailorResultsProps) {
-  const [confirmingRegenerate, setConfirmingRegenerate] = useState(false)
+  const [confirming, setConfirming] = useState<'regenerate' | 'delete' | null>(null)
   const { counts } = resume
   const hasDecisions = counts.accepted + counts.rejected > 0
 
@@ -133,7 +135,7 @@ export function TailorResults({
         </Button>
         {notice && <span className="text-xs text-muted-foreground">{notice}</span>}
         <span className="flex-1" />
-        {confirmingRegenerate ? (
+        {confirming === 'regenerate' && (
           <span className="flex flex-wrap items-center gap-2 text-sm">
             <span className="text-muted-foreground">
               {hasDecisions
@@ -145,20 +147,47 @@ export function TailorResults({
               size="sm"
               disabled={isBusy}
               onClick={() => {
-                setConfirmingRegenerate(false)
+                setConfirming(null)
                 onRegenerate()
               }}
             >
               Regenerate
             </Button>
-            <Button variant="ghost" size="sm" onClick={() => setConfirmingRegenerate(false)}>
+            <Button variant="ghost" size="sm" onClick={() => setConfirming(null)}>
               Cancel
             </Button>
           </span>
-        ) : (
-          <Button variant="ghost" size="sm" onClick={() => setConfirmingRegenerate(true)}>
-            <RefreshCw className="h-3.5 w-3.5" /> Regenerate
-          </Button>
+        )}
+        {confirming === 'delete' && (
+          <span className="flex flex-wrap items-center gap-2 text-sm">
+            <span className="text-muted-foreground">
+              Delete this draft? Your profile isn&apos;t affected.
+            </span>
+            <Button
+              variant="destructive"
+              size="sm"
+              disabled={isBusy}
+              onClick={() => {
+                setConfirming(null)
+                onDelete()
+              }}
+            >
+              Delete draft
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setConfirming(null)}>
+              Cancel
+            </Button>
+          </span>
+        )}
+        {confirming === null && (
+          <>
+            <Button variant="ghost" size="sm" onClick={() => setConfirming('delete')}>
+              <Trash2 className="h-3.5 w-3.5" /> Delete
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setConfirming('regenerate')}>
+              <RefreshCw className="h-3.5 w-3.5" /> Regenerate
+            </Button>
+          </>
         )}
       </div>
     </div>

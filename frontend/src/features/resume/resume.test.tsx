@@ -147,6 +147,7 @@ function renderResults(r: TailoredResume, props: Partial<Parameters<typeof Tailo
   const handlers = {
     onDecide: vi.fn(),
     onRegenerate: vi.fn(),
+    onDelete: vi.fn(),
     onCopy: vi.fn(),
     onDownload: vi.fn(),
   }
@@ -257,5 +258,20 @@ describe('TailorResults', () => {
     fireEvent.click(screen.getByRole('button', { name: /Accept/ }))
 
     expect(handlers.onDecide).toHaveBeenCalledWith('c1', 'accepted')
+  })
+
+  it('makes deleting a draft a two-step action that leaves the profile alone', () => {
+    const handlers = renderResults(resume())
+
+    fireEvent.click(screen.getByRole('button', { name: /^Delete$/ }))
+    expect(handlers.onDelete).not.toHaveBeenCalled()
+    expect(screen.getByText(/Your profile isn.t affected/)).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(handlers.onDelete).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: /^Delete$/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Delete draft' }))
+    expect(handlers.onDelete).toHaveBeenCalledOnce()
   })
 })

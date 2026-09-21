@@ -7,6 +7,7 @@ import { ErrorState } from '@/components/layout/error-state'
 import type { CareerJob } from '@/lib/api'
 import {
   useDecideChange,
+  useDeleteResume,
   useExportResume,
   useTailorJob,
   useTailoredResume,
@@ -34,6 +35,7 @@ export function TailorPanel({ job }: { job: CareerJob }) {
   const tailor = useTailorJob()
   const decide = useDecideChange()
   const exporter = useExportResume()
+  const remove = useDeleteResume()
   const [notice, setNotice] = useState<string | null>(null)
 
   const header = (
@@ -133,12 +135,13 @@ export function TailorPanel({ job }: { job: CareerJob }) {
       <CardContent className="space-y-4">
         <TailorResults
           resume={resume}
-          isBusy={decide.isPending || exporter.isPending || tailor.isPending}
+          isBusy={decide.isPending || exporter.isPending || tailor.isPending || remove.isPending}
           notice={notice}
           onDecide={(changeId, decision) =>
             decide.mutate({ resumeId: resume.id, changeId, decision })
           }
           onRegenerate={() => tailor.mutate(job.id)}
+          onDelete={() => remove.mutate({ resumeId: resume.id, jobId: job.id })}
           onCopy={() =>
             void exportAnd(async (markdown) => {
               await navigator.clipboard.writeText(markdown)
@@ -150,6 +153,7 @@ export function TailorPanel({ job }: { job: CareerJob }) {
         />
         {decide.isError && <ErrorState message={messageOf(decide.error) ?? 'Failed to save'} />}
         {exporter.isError && <ErrorState message={messageOf(exporter.error) ?? 'Export failed'} />}
+        {remove.isError && <ErrorState message={messageOf(remove.error) ?? 'Failed to delete'} />}
       </CardContent>
     </Card>
   )
