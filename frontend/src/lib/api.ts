@@ -560,6 +560,54 @@ export interface GithubAcceptResult {
   skill_version_id: string
 }
 
+export type GithubCheckStatus = 'pass' | 'warn' | 'fail' | 'unknown'
+
+export interface GithubCheck {
+  key: string
+  label: string
+  status: GithubCheckStatus
+  detail: string
+  evidence_url: string | null
+  fix: string | null
+}
+
+export interface GithubRepoReview {
+  name: string
+  html_url: string
+  reviewed: boolean
+  reason: string | null
+  checks: GithubCheck[]
+  passed: number
+  total: number
+  unknown: number
+}
+
+export interface GithubFix {
+  repo: string | null
+  repo_url: string | null
+  check_key: string
+  label: string
+  status: 'warn' | 'fail'
+  detail: string
+  fix: string
+  evidence_url: string | null
+}
+
+export interface GithubReadiness {
+  synced: boolean
+  as_of: string | null
+  needs_resync: boolean
+  repos: GithubRepoReview[]
+  profile: GithubCheck[]
+  fixes: GithubFix[]
+  limitations: string[]
+}
+
+export interface GithubReadinessExport {
+  filename: string
+  text: string
+}
+
 export const githubApi = {
   getConnection(token: string) {
     return apiFetch<GithubConnection>('/github/connection', { headers: authHeaders(token) })
@@ -599,6 +647,12 @@ export const githubApi = {
       method: 'POST',
       headers: authHeaders(token),
     })
+  },
+  getReadiness(token: string) {
+    return apiFetch<GithubReadiness>('/github/readiness', { headers: authHeaders(token) })
+  },
+  exportReadiness(token: string) {
+    return apiFetch<GithubReadinessExport>('/github/readiness/export', { headers: authHeaders(token) })
   },
 }
 

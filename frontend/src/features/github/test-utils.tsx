@@ -3,7 +3,15 @@ import { MemoryRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render } from '@testing-library/react'
 import { vi } from 'vitest'
-import type { GithubConnection, GithubProposal, GithubRepo, GithubSyncRun } from '@/lib/api'
+import type {
+  GithubCheck,
+  GithubConnection,
+  GithubProposal,
+  GithubReadiness,
+  GithubRepo,
+  GithubRepoReview,
+  GithubSyncRun,
+} from '@/lib/api'
 
 export const CONNECTION: GithubConnection = {
   id: 'c1',
@@ -97,12 +105,88 @@ export function proposal(overrides: Partial<GithubProposal> = {}): GithubProposa
   }
 }
 
+export function check(overrides: Partial<GithubCheck> = {}): GithubCheck {
+  return {
+    key: 'license',
+    label: 'Has a license',
+    status: 'fail',
+    detail: 'No license, so nobody is allowed to reuse the code.',
+    evidence_url: null,
+    fix: 'Add a LICENSE file.',
+    ...overrides,
+  }
+}
+
+export function repoReview(overrides: Partial<GithubRepoReview> = {}): GithubRepoReview {
+  return {
+    name: 'AegisAI',
+    html_url: 'https://github.com/aziz-ahmad555/AegisAI',
+    reviewed: true,
+    reason: null,
+    checks: [
+      check({ key: 'description', label: 'Has a description', status: 'pass', detail: '“A platform”', fix: null }),
+      check({ key: 'readme', label: 'Has a README', status: 'fail', detail: 'No README in the repository root.', fix: 'Add a README.md.' }),
+      check({ key: 'tests', label: 'Has automated tests', status: 'unknown', detail: 'Sync again to include this.', fix: null }),
+      check({
+        key: 'junk',
+        label: 'No junk files committed',
+        status: 'warn',
+        detail: 'Committed: .yolov8n.part.',
+        evidence_url: 'https://github.com/aziz-ahmad555/AegisAI/blob/main/.yolov8n.part',
+        fix: 'Delete these files and add them to .gitignore.',
+      }),
+    ],
+    passed: 1,
+    total: 4,
+    unknown: 1,
+    ...overrides,
+  }
+}
+
+export function readiness(overrides: Partial<GithubReadiness> = {}): GithubReadiness {
+  return {
+    synced: true,
+    as_of: '2026-09-22T10:00:05Z',
+    needs_resync: false,
+    repos: [repoReview()],
+    profile: [
+      check({ key: 'bio', label: 'Bio is set', status: 'pass', detail: '“ML engineer”', fix: null }),
+      check({ key: 'profile_readme', label: 'Has a profile README', status: 'warn', detail: 'No public repository named you.', fix: 'Create a profile README repo.' }),
+    ],
+    fixes: [
+      {
+        repo: 'AegisAI',
+        repo_url: 'https://github.com/aziz-ahmad555/AegisAI',
+        check_key: 'readme',
+        label: 'Has a README',
+        status: 'fail',
+        detail: 'No README in the repository root.',
+        fix: 'Add a README.md.',
+        evidence_url: null,
+      },
+      {
+        repo: null,
+        repo_url: null,
+        check_key: 'profile_readme',
+        label: 'Has a profile README',
+        status: 'warn',
+        detail: 'No public repository named you.',
+        fix: 'Create a profile README repo.',
+        evidence_url: null,
+      },
+    ],
+    limitations: ['Pinned repositories can’t be read with this access.'],
+    ...overrides,
+  }
+}
+
 type Handler = (init?: RequestInit) => Response
 
 const EMPTY_DATA: Record<string, Handler> = {
   '/github/sync': () => json([]),
   '/github/proposals': () => json([]),
   '/github/repos': () => json([]),
+  '/github/readiness': () => json({ synced: false, as_of: null, needs_resync: false, repos: [], profile: [], fixes: [], limitations: [] }),
 }
 
 /** Routes by path (query ignored). Anything unlisted throws, so a stray request fails loudly. */

@@ -47,12 +47,13 @@ describe('GithubPage', () => {
     expect(screen.getByText(/no permissions/)).toBeInTheDocument()
   })
 
-  it('says plainly that the import and review are not built yet', async () => {
+  it('says it reviews repositories and only suggests, never edits', async () => {
     stubApi({ '/github/connection': () => json({ detail: 'Not found' }, 404) })
     renderAt(<GithubPage />)
 
-    expect(await screen.findByText('Not built yet:')).toBeInTheDocument()
-    expect(screen.getByText(/recruiter-readiness review/)).toBeInTheDocument()
+    expect(await screen.findByText(/Review each repository for what a recruiter looks for/)).toBeInTheDocument()
+    expect(screen.getByText(/it never edits anything/)).toBeInTheDocument()
+    expect(screen.queryByText('Not built yet:')).not.toBeInTheDocument()
   })
 
   it('shows the connected account, its status and what it can reach', async () => {

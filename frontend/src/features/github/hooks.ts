@@ -99,3 +99,13 @@ export function useDismissProposal() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['github', 'proposals'] }),
   })
 }
+
+export function useGithubReadiness() {
+  const token = useToken()
+  return useQuery({ queryKey: ['github', 'readiness'], queryFn: () => githubApi.getReadiness(token) })
+}
+
+export function useExportReadiness() {
+  const token = useToken()
+  return useMutation({ mutationFn: () => githubApi.exportReadiness(token) })
+}

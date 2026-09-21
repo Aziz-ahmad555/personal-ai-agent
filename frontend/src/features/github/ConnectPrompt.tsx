@@ -32,6 +32,10 @@ export function ConnectPrompt({ reconnect = false }: { reconnect?: boolean }) {
                   commits attributed to you, and recent public activity.
                 </li>
                 <li>Suggest skills those repositories evidence. You decide on each one.</li>
+                <li>
+                  Review each repository for what a recruiter looks for (README, license, tests and
+                  so on) and suggest fixes. It only suggests; it never edits anything.
+                </li>
               </ul>
             </div>
             <div>
@@ -46,10 +50,6 @@ export function ConnectPrompt({ reconnect = false }: { reconnect?: boolean }) {
               </ul>
             </div>
             <p>You can disconnect at any time. That revokes the token on GitHub and clears it here.</p>
-            <p className="rounded-md bg-muted p-3">
-              <span className="font-medium text-foreground">Not built yet:</span> the
-              recruiter-readiness review of your repositories.
-            </p>
           </div>
         </div>
 

@@ -6,6 +6,7 @@ import { ErrorState } from '@/components/layout/error-state'
 import { ConnectPrompt } from '@/features/github/ConnectPrompt'
 import { ConnectionCard } from '@/features/github/ConnectionCard'
 import { ProposalsSection } from '@/features/github/ProposalsSection'
+import { ReadinessSection } from '@/features/github/ReadinessSection'
 import { RepoList } from '@/features/github/RepoList'
 import { SyncCard } from '@/features/github/SyncCard'
 import { useGithubConnection } from '@/features/github/hooks'
@@ -65,6 +66,7 @@ export function GithubPage() {
           <ConnectionCard connection={connection} />
           <SyncCard connection={connection} />
           <ProposalsSection />
+          <ReadinessSection />
           <RepoList />
         </>
       )}

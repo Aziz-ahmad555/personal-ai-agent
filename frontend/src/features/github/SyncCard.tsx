@@ -28,6 +28,7 @@ export function SyncCard({ connection }: { connection: GithubConnection }) {
     if (wasActive && !ACTIVE.has(latest.status)) {
       queryClient.invalidateQueries({ queryKey: ['github', 'repos'] })
       queryClient.invalidateQueries({ queryKey: ['github', 'proposals'] })
+      queryClient.invalidateQueries({ queryKey: ['github', 'readiness'] })
     }
   }, [latest, queryClient])
 
