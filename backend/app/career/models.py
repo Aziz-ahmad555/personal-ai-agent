@@ -1,10 +1,11 @@
 import uuid
-from datetime import datetime
+from datetime import UTC, date, datetime
 from typing import Any
 
 from sqlalchemy import (
     JSON,
     Boolean,
+    Date,
     DateTime,
     ForeignKey,
     Integer,
@@ -240,4 +241,83 @@ class JobMatch(Base):
     profile_stamp: Mapped[str | None] = mapped_column(String(64))
     computed_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+# saved -> applied -> screening -> interviewing -> offer are the "active" stages; the rest
+# close an application. The rules for moving between them live in app.career.applications
+# (plain code) — never inferred from email or decided by an LLM: every status here was put
+# there by the user.
+APPLICATION_STATUSES = (
+    "saved",
+    "applied",
+    "screening",
+    "interviewing",
+    "offer",
+    "accepted",
+    "rejected",
+    "withdrawn",
+    "no_response",
+)
+APPLICATION_EVENT_TYPES = ("status_change", "note", "interview")
+
+
+class Application(Base):
+    """The user's own record of applying to a JobPosting. Bookkeeping only — nothing is ever
+    submitted or sent from here. One per posting, so the posting's match, fraud, and
+    employer-verification evidence stay attached to it."""
+
+    __tablename__ = "applications"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    job_posting_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("job_postings.id", ondelete="CASCADE"), unique=True, nullable=False
+    )
+    status: Mapped[str] = mapped_column(String(20), default="saved", nullable=False)
+    notes: Mapped[str | None] = mapped_column(Text)
+
+    # The date the user says they applied — not when they logged it.
+    applied_on: Mapped[date | None] = mapped_column(Date)
+
+    # A single "what's next" reminder, shown in-app only (nothing is sent). Whether it's due
+    # or overdue is computed by app.career.applications.follow_up_state, not stored.
+    next_action_text: Mapped[str | None] = mapped_column(String(255))
+    next_action_on: Mapped[date | None] = mapped_column(Date)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
+class ApplicationEvent(Base):
+    """Append-only timeline entry. `occurred_on` is the date the user says it happened (they
+    may log an application days after sending it); `created_at` is when it was recorded."""
+
+    __tablename__ = "application_events"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    application_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("applications.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    event_type: Mapped[str] = mapped_column(String(20), nullable=False)
+    from_status: Mapped[str | None] = mapped_column(String(20))
+    to_status: Mapped[str | None] = mapped_column(String(20))
+    occurred_on: Mapped[date] = mapped_column(Date, nullable=False)
+    body: Mapped[str | None] = mapped_column(Text)
+    # Set on the move to "applied": the posting's match / fraud / employer state at that
+    # moment, so "applied at 72%, low confidence" stays true even after the live values change.
+    snapshot: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+    # Set in Python (microsecond resolution), not only by the database, so events recorded
+    # within the same second still order deterministically on the timeline.
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        server_default=func.now(),
+        nullable=False,
     )
