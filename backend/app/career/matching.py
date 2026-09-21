@@ -190,6 +190,15 @@ def normalize_skill(name: str) -> str:
     return _SKILL_ALIASES.get(cleaned, cleaned)
 
 
+def skill_variants(name: str) -> set[str]:
+    """Every spelling that counts as the same skill (the name itself, its canonical form, and
+    known aliases), lower-cased — for finding a skill mentioned in free text."""
+    canonical = normalize_skill(name)
+    variants = {canonical, name.strip().lower()}
+    variants.update(alias for alias, canon in _SKILL_ALIASES.items() if canon == canonical)
+    return {v for v in variants if v}
+
+
 def _normalize_text(text: str) -> str:
     return re.sub(r"\s+", " ", text.lower()).strip()
 

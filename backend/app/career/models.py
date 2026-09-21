@@ -321,3 +321,75 @@ class ApplicationEvent(Base):
         server_default=func.now(),
         nullable=False,
     )
+
+
+class TailoredResume(Base):
+    """A resume tailored to one job posting, built from the user's profile — never from free
+    text, so there's no second copy of the truth to drift. Nothing is final until the user
+    accepts changes one by one (ResumeChange.decision); pending and rejected changes leave
+    the original wording in place. Green risk: it's a local draft, nothing is sent anywhere."""
+
+    __tablename__ = "tailored_resumes"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    job_posting_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("job_postings.id", ondelete="CASCADE"), unique=True, nullable=False
+    )
+    status: Mapped[str] = mapped_column(String(20), default="running", nullable=False)
+    error: Mapped[str | None] = mapped_column(Text)
+    # Like JobMatch.started_at: a background task dies with the server, so a "running" row
+    # older than the timeout is reported as failed on read.
+    started_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    # The base resume exactly as it was assembled from the profile at generation time. Changes
+    # are reviewed and exported against *this*, not the live profile, so what was reviewed is
+    # what gets exported.
+    base: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+    # The verified posting requirements the tailoring aimed at: [{name, kind, quote}].
+    requirements: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list, nullable=False)
+    # Required/preferred skills the profile has no evidence for. Listed for the user; never
+    # written into the resume: [{skill, kind, reason}].
+    gaps: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list, nullable=False)
+    # Proposals discarded by verification (they added claims the profile doesn't support):
+    # [{source, reason}]. Kept so a misbehaving model is visible, not silently absorbed.
+    dropped: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list, nullable=False)
+    # Hash of the base's content; a different current hash means the profile changed since.
+    profile_stamp: Mapped[str | None] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+RESUME_CHANGE_TYPES = ("rewrite", "skills_order")
+RESUME_DECISIONS = ("pending", "accepted", "rejected")
+
+
+class ResumeChange(Base):
+    """One proposed edit, reviewed on its own. `addresses` carries the posting requirement(s)
+    the edit speaks to, each with its verified quote from the posting."""
+
+    __tablename__ = "resume_changes"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    resume_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("tailored_resumes.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    change_type: Mapped[str] = mapped_column(String(20), nullable=False)
+    # "summary", "exp:<work experience id>", or "skills".
+    target_id: Mapped[str] = mapped_column(String(80), nullable=False)
+    target_label: Mapped[str] = mapped_column(String(255), nullable=False)
+    before_text: Mapped[str] = mapped_column(Text, nullable=False)
+    after_text: Mapped[str] = mapped_column(Text, nullable=False)
+    rationale: Mapped[str] = mapped_column(Text, nullable=False)
+    addresses: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list, nullable=False)
+    decision: Mapped[str] = mapped_column(String(10), default="pending", nullable=False)
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    position: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
