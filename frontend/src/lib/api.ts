@@ -20,11 +20,74 @@ async function parseErrorDetail(response: Response): Promise<string> {
   }
 }
 
+/** Lets the auth store plug token refresh into every request without api.ts importing it
+ * (the store imports api.ts, so the reverse would be a cycle). */
+export interface AuthHooks {
+  getRefreshToken: () => string | null
+  onRefreshed: (tokens: TokenPair) => void
+  /** Refreshing failed too: the session is over and the user must sign in again. */
+  onExpired: () => void
+}
+
+let authHooks: AuthHooks | null = null
+
+export function configureAuthHooks(hooks: AuthHooks): void {
+  authHooks = hooks
+}
+
+// One refresh at a time: a page fires several requests at once, and when the access token has
+// expired they all get a 401 together — they must share a single refresh, not race.
+let refreshInFlight: Promise<TokenPair | null> | null = null
+
+function refreshAccessToken(): Promise<TokenPair | null> {
+  if (refreshInFlight) return refreshInFlight
+  const refreshToken = authHooks?.getRefreshToken()
+  if (!authHooks || !refreshToken) return Promise.resolve(null)
+  const hooks = authHooks
+
+  refreshInFlight = (async () => {
+    try {
+      const response = await fetch(`${API_URL}/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh_token: refreshToken }),
+      })
+      if (!response.ok) return null
+      const tokens = (await response.json()) as TokenPair
+      hooks.onRefreshed(tokens)
+      return tokens
+    } catch {
+      return null
+    } finally {
+      refreshInFlight = null
+    }
+  })()
+  return refreshInFlight
+}
+
+function send(path: string, init: RequestInit): Promise<Response> {
+  // Normalized through Headers (not object-spread) so callers may pass a plain object or a
+  // Headers instance, and a caller-set Content-Type wins over the JSON default.
+  const headers = new Headers(init.headers)
+  if (!headers.has('Content-Type')) headers.set('Content-Type', 'application/json')
+  return fetch(`${API_URL}${path}`, { ...init, headers })
+}
+
 async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const response = await fetch(`${API_URL}${path}`, {
-    ...init,
-    headers: { 'Content-Type': 'application/json', ...init.headers },
-  })
+  let response = await send(path, init)
+
+  // An authenticated request that got a 401 usually just means the 30-minute access token
+  // expired. Refresh once and retry; only if that fails is the session actually over.
+  const hadToken = new Headers(init.headers).has('Authorization')
+  if (response.status === 401 && hadToken && authHooks) {
+    const tokens = await refreshAccessToken()
+    if (tokens) {
+      const headers = new Headers(init.headers)
+      headers.set('Authorization', `Bearer ${tokens.access_token}`)
+      response = await send(path, { ...init, headers })
+    }
+    if (response.status === 401) authHooks.onExpired()
+  }
 
   if (!response.ok) {
     throw new ApiError(response.status, await parseErrorDetail(response))

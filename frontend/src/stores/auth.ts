@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { authApi, type UserRead } from '@/lib/api'
+import { authApi, configureAuthHooks, type UserRead } from '@/lib/api'
 
 interface AuthState {
   accessToken: string | null
@@ -51,3 +51,16 @@ export const useAuthStore = create<AuthState>()(
     }
   )
 )
+
+// Wire token refresh into every API call. Kept here (not in api.ts) because the store already
+// imports api.ts; a 401 that survives a refresh signs the user out, and ProtectedRoute then
+// sends them to /login.
+configureAuthHooks({
+  getRefreshToken: () => useAuthStore.getState().refreshToken,
+  onRefreshed: (tokens) =>
+    useAuthStore.setState({
+      accessToken: tokens.access_token,
+      refreshToken: tokens.refresh_token,
+    }),
+  onExpired: () => useAuthStore.getState().logout(),
+})
