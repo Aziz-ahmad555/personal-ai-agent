@@ -5,11 +5,16 @@ from collections.abc import Awaitable, Callable
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.audit.router import router as audit_router
 from app.auth.router import router as auth_router
+from app.career.router import router as career_router
 from app.config import get_settings
 from app.core.health import router as health_router
+from app.gmail.router import router as gmail_router
 from app.logging import configure_logging, get_logger
 from app.profile.router import router as profile_router
+from app.research.router import router as research_router
+from app.search.router import router as search_router
 
 configure_logging()
 logger = get_logger(__name__)
@@ -49,6 +54,11 @@ def create_app() -> FastAPI:
     app.include_router(health_router)
     app.include_router(auth_router)
     app.include_router(profile_router)
+    app.include_router(research_router)
+    app.include_router(search_router)
+    app.include_router(gmail_router)
+    app.include_router(career_router)
+    app.include_router(audit_router)
 
     return app
 

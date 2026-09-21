@@ -8,7 +8,12 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.db.models import User
 from app.profile import embeddings
-from app.profile.models import Profile, ProfileEmbedding
+from app.profile.models import Preferences, Profile, ProfileEmbedding
+
+# Captured before any test runs, so it's unaffected by the autouse `_fake_embeddings`
+# fixture in conftest.py, which replaces `embeddings.embed_texts` wholesale per test —
+# tests that need the *real* implementation (e.g. its error handling) call this instead.
+_real_embed_texts = embeddings.embed_texts
 
 
 async def test_get_client_returns_none_without_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -18,6 +23,47 @@ async def test_get_client_returns_none_without_api_key(monkeypatch: pytest.Monke
     )
 
     assert embeddings._get_client() is None
+
+
+async def test_embed_texts_returns_none_on_api_error_instead_of_raising(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A transient Voyage failure (rate limit, network blip, outage) must degrade to "no
+    embeddings" like a missing API key does — never crash the caller's whole operation.
+    Regression test for a real rate-limit error that crashed an in-progress research query."""
+
+    class _FakeClient:
+        async def embed(self, texts: list[str], *, model: str, input_type: str) -> None:
+            raise RuntimeError("429 rate limited")
+
+    monkeypatch.setattr(embeddings, "_get_client", lambda: _FakeClient())
+
+    result = await _real_embed_texts(["some text"])
+
+    assert result is None
+
+
+async def test_embed_query_uses_query_input_type(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Voyage's retrieval models are asymmetric — the query side must be embedded with
+    input_type="query" (not "document", used for indexed content) for good match quality.
+    embed_query() delegates to embed_texts() by module-level name, which the autouse
+    _fake_embeddings fixture replaces wholesale for every test — restore the real
+    embed_texts here so this test actually exercises the input_type plumbing."""
+    seen_input_types: list[str] = []
+
+    class _FakeClient:
+        async def embed(self, texts: list[str], *, model: str, input_type: str) -> object:
+            seen_input_types.append(input_type)
+            return types.SimpleNamespace(embeddings=[[0.1] * 512 for _ in texts])
+
+    monkeypatch.setattr(embeddings, "embed_texts", _real_embed_texts)
+    monkeypatch.setattr(embeddings, "_get_client", lambda: _FakeClient())
+
+    result = await embeddings.embed_query("does acme sponsor visas")
+
+    assert seen_input_types == ["query"]
+    assert result is not None
+    assert len(result) == 512
 
 
 async def test_sync_embedding_skips_storage_when_embeddings_disabled(
@@ -68,3 +114,81 @@ async def test_profile_update_stores_a_bio_embedding(
         embedding = result.scalar_one()
         assert len(embedding.embedding) == 512
         assert "ML Engineer" in embedding.chunk_text
+
+
+async def test_education_create_stores_an_embedding(
+    client: AsyncClient,
+    auth_headers: dict[str, str],
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    response = await client.post(
+        "/profile/education",
+        headers=auth_headers,
+        json={"institution": "State University", "degree": "BSc", "field": "Computer Science"},
+    )
+    education_id = uuid.UUID(response.json()["id"])
+
+    async with session_factory() as db:
+        result = await db.execute(
+            select(ProfileEmbedding).where(
+                ProfileEmbedding.owner_type == "education",
+                ProfileEmbedding.owner_id == education_id,
+            )
+        )
+        embedding = result.scalar_one()
+        assert "State University" in embedding.chunk_text
+        assert "Computer Science" in embedding.chunk_text
+
+
+async def test_education_delete_removes_embedding(
+    client: AsyncClient,
+    auth_headers: dict[str, str],
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    response = await client.post(
+        "/profile/education", headers=auth_headers, json={"institution": "Tech Institute"}
+    )
+    education_id = uuid.UUID(response.json()["id"])
+
+    await client.delete(f"/profile/education/{education_id}", headers=auth_headers)
+
+    async with session_factory() as db:
+        result = await db.execute(
+            select(ProfileEmbedding).where(
+                ProfileEmbedding.owner_type == "education",
+                ProfileEmbedding.owner_id == education_id,
+            )
+        )
+        assert result.first() is None
+
+
+async def test_preferences_update_stores_an_embedding(
+    client: AsyncClient,
+    auth_headers: dict[str, str],
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    response = await client.put(
+        "/profile/preferences",
+        headers=auth_headers,
+        json={"job_types": ["full_time"], "remote_preference": "remote", "locations": ["Remote"]},
+    )
+    assert response.status_code == 200
+
+    # PreferencesRead has no id field (it's a per-user singleton) — resolve the row directly.
+    async with session_factory() as db:
+        user = (
+            await db.execute(select(User).where(User.email == "profile-owner@example.com"))
+        ).scalar_one()
+        preferences = (
+            await db.execute(select(Preferences).where(Preferences.user_id == user.id))
+        ).scalar_one()
+
+        result = await db.execute(
+            select(ProfileEmbedding).where(
+                ProfileEmbedding.owner_type == "preferences",
+                ProfileEmbedding.owner_id == preferences.id,
+            )
+        )
+        embedding = result.scalar_one()
+        assert "full_time" in embedding.chunk_text
+        assert "remote" in embedding.chunk_text

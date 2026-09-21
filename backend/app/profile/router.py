@@ -267,6 +267,10 @@ async def list_education(
     return list(result.scalars())
 
 
+def _education_text(education: Education) -> str:
+    return " ".join(filter(None, [education.degree, education.field, education.institution]))
+
+
 @router.post("/education", response_model=EducationRead, status_code=status.HTTP_201_CREATED)
 async def create_education(
     payload: EducationCreate,
@@ -276,6 +280,15 @@ async def create_education(
     profile = await _get_or_create_profile(db, current_user)
     education = Education(profile_id=profile.id, **payload.model_dump())
     db.add(education)
+    await db.flush()
+
+    await sync_embedding(
+        db,
+        profile_id=profile.id,
+        owner_type="education",
+        owner_id=education.id,
+        text=_education_text(education),
+    )
     await db.commit()
     await db.refresh(education)
     return education
@@ -292,6 +305,15 @@ async def update_education(
     education = await _get_owned_education(db, education_id, profile.id)
     for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(education, field, value)
+    await db.flush()
+
+    await sync_embedding(
+        db,
+        profile_id=profile.id,
+        owner_type="education",
+        owner_id=education.id,
+        text=_education_text(education),
+    )
     await db.commit()
     await db.refresh(education)
     return education
@@ -305,6 +327,7 @@ async def delete_education(
 ) -> None:
     profile = await _get_or_create_profile(db, current_user)
     education = await _get_owned_education(db, education_id, profile.id)
+    await delete_embedding(db, owner_type="education", owner_id=education.id)
     await db.delete(education)
     await db.commit()
 
@@ -417,6 +440,26 @@ async def get_preferences(
     return preferences
 
 
+def _preferences_text(preferences: Preferences) -> str:
+    parts: list[str] = []
+    if preferences.job_types:
+        parts.append(f"Job types: {', '.join(preferences.job_types)}")
+    parts.append(f"Remote preference: {preferences.remote_preference}")
+    if preferences.locations:
+        parts.append(f"Locations: {', '.join(preferences.locations)}")
+    if preferences.salary_min is not None or preferences.salary_max is not None:
+        low = preferences.salary_min if preferences.salary_min is not None else "?"
+        high = preferences.salary_max if preferences.salary_max is not None else "?"
+        parts.append(f"Salary range: {low}-{high}")
+    if preferences.industries_include:
+        parts.append(f"Interested industries: {', '.join(preferences.industries_include)}")
+    if preferences.industries_exclude:
+        parts.append(f"Excluded industries: {', '.join(preferences.industries_exclude)}")
+    if preferences.deal_breakers:
+        parts.append(f"Deal breakers: {preferences.deal_breakers}")
+    return ". ".join(parts)
+
+
 @router.put("/preferences", response_model=PreferencesRead)
 async def update_preferences(
     payload: PreferencesUpdate,
@@ -426,6 +469,19 @@ async def update_preferences(
     preferences = await _get_or_create_preferences(db, current_user)
     for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(preferences, field, value)
+    await db.flush()
+
+    # Preferences has no direct link to Profile, but ProfileEmbedding rows require a
+    # profile_id (for cascade-delete grouping) — fetch/create it purely for that FK.
+    profile = await _get_or_create_profile(db, current_user)
+    await sync_embedding(
+        db,
+        profile_id=profile.id,
+        owner_type="preferences",
+        owner_id=preferences.id,
+        text=_preferences_text(preferences),
+    )
+
     await db.commit()
     await db.refresh(preferences)
     return preferences

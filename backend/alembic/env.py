@@ -6,9 +6,21 @@ from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from alembic import context
+from app.audit.models import AuditLog  # noqa: F401 — registers model metadata
+from app.career.models import (  # noqa: F401 — registers model metadata
+    EmployerVerification,
+    JobBoardFeed,
+    JobFraudAssessment,
+    JobPosting,
+)
 from app.config import get_settings
 from app.db.base import Base
 from app.db.models import User  # noqa: F401 — registers model metadata
+from app.gmail.models import (  # noqa: F401 — registers model metadata
+    EmailMessage,
+    GmailConnection,
+    GmailSyncRun,
+)
 from app.profile.models import (  # noqa: F401 — registers model metadata
     Education,
     Preferences,
@@ -18,6 +30,15 @@ from app.profile.models import (  # noqa: F401 — registers model metadata
     Skill,
     SkillVersion,
     WorkExperience,
+)
+from app.research.models import (  # noqa: F401 — registers model metadata
+    ResearchClaim,
+    ResearchClaimCitation,
+    ResearchEmbedding,
+    ResearchQuery,
+    ResearchQuerySource,
+    ResearchReport,
+    ResearchSource,
 )
 
 config = context.config

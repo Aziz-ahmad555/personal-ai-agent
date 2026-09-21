@@ -3,6 +3,9 @@ from collections.abc import AsyncGenerator
 
 os.environ.setdefault("APP_SECRET_KEY", "test-secret-key-not-for-production-use")
 os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///:memory:")
+os.environ.setdefault("TOKEN_ENCRYPTION_KEY", "Emb1Qfnswo7SlMmYcYu1OjTpVMmleBlkM_lpO-nh2Eo=")
+os.environ.setdefault("GOOGLE_CLIENT_ID", "test-client-id.apps.googleusercontent.com")
+os.environ.setdefault("GOOGLE_CLIENT_SECRET", "test-client-secret")
 
 import pytest  # noqa: E402
 from httpx import ASGITransport, AsyncClient  # noqa: E402
@@ -13,6 +16,7 @@ from sqlalchemy.ext.asyncio import (  # noqa: E402
 )
 from sqlalchemy.pool import StaticPool  # noqa: E402
 
+from app.db import base as db_base  # noqa: E402
 from app.db.base import Base, get_db  # noqa: E402
 from app.main import app  # noqa: E402
 
@@ -30,6 +34,12 @@ async def _override_get_db() -> AsyncGenerator[AsyncSession, None]:
 
 
 app.dependency_overrides[get_db] = _override_get_db
+
+# BackgroundTasks (e.g. the Research Engine's pipeline) run outside FastAPI's DI scope, so
+# they can't go through the get_db override above — they look up db_base.async_session_factory
+# directly instead. Point that at the same in-memory test database so background work in
+# tests reads/writes the tables _setup_db actually created, not the production engine.
+db_base.async_session_factory = TestSessionFactory
 
 
 @pytest.fixture(autouse=True)
@@ -53,7 +63,9 @@ def _fake_embeddings(monkeypatch: pytest.MonkeyPatch) -> None:
     deterministic fake vector, so the storage path is exercised; test_embeddings.py
     overrides this to simulate the no-API-key skip path explicitly."""
 
-    async def _fake_embed_texts(texts: list[str]) -> list[list[float]] | None:
+    async def _fake_embed_texts(
+        texts: list[str], *, input_type: str = "document"
+    ) -> list[list[float]] | None:
         return [[0.0] * 512 for _ in texts]
 
     monkeypatch.setattr("app.profile.embeddings.embed_texts", _fake_embed_texts)

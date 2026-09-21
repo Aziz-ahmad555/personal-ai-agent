@@ -7,7 +7,7 @@ import jwt
 
 from app.config import get_settings
 
-TokenType = Literal["access", "refresh"]
+TokenType = Literal["access", "refresh", "oauth_state"]
 
 
 def hash_password(plain_password: str) -> str:
@@ -24,8 +24,12 @@ def create_token(subject: uuid.UUID, token_type: TokenType) -> str:
 
     if token_type == "access":
         expires_delta = timedelta(minutes=settings.access_token_expire_minutes)
-    else:
+    elif token_type == "refresh":
         expires_delta = timedelta(days=settings.refresh_token_expire_days)
+    else:
+        # OAuth "state" param: only needs to survive the redirect to Google and back —
+        # short-lived on purpose, since it's also this flow's CSRF protection.
+        expires_delta = timedelta(minutes=10)
 
     payload: dict[str, Any] = {
         "sub": str(subject),

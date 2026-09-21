@@ -18,13 +18,19 @@ dependencies = [
     "python-multipart>=0.0.9",
     "pgvector>=0.3,<1.0",
     "voyageai>=0.3,<1.0",
+    "anthropic>=0.40,<1.0",
+    "google-genai>=0.3,<1.0",
+    "tavily-python>=0.5,<1.0",
+    "httpx>=0.27,<1.0",
+    "trafilatura>=1.12,<2.0",
+    "langgraph>=0.2,<1.0",
+    "cryptography>=43.0,<46.0",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=8.3,<9.0",
     "pytest-asyncio>=0.24,<1.0",
-    "httpx>=0.27,<1.0",
     "aiosqlite>=0.20,<1.0",
     "ruff>=0.6,<1.0",
     "mypy>=1.11,<2.0",
@@ -58,3 +64,7 @@ python_version = "3.11"
 strict = true
 plugins = ["pydantic.mypy"]
 exclude = ["alembic/"]
+
+[[tool.mypy.overrides]]
+module = ["tavily.*", "google.*", "trafilatura.*"]
+ignore_missing_imports = true

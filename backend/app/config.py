@@ -27,6 +27,45 @@ class Settings(BaseSettings):
     voyage_model: str = "voyage-3-lite"
     voyage_embedding_dimensions: int = 512
 
+    tavily_api_key: str | None = None
+
+    # Which LLM backs claim extraction/report drafting — swappable without touching
+    # pipeline logic (see app.research.llm.LLMProvider). "gemini" | "anthropic".
+    llm_provider: str = "gemini"
+
+    anthropic_api_key: str | None = None
+    anthropic_model: str = "claude-haiku-4-5-20251001"
+
+    gemini_api_key: str | None = None
+    gemini_model: str = "gemini-3.6-flash"
+
+    research_max_sources_per_query: int = 8
+    research_fetch_timeout_seconds: float = 15.0
+    research_fetch_concurrency: int = 4
+    research_max_content_chars: int = 20_000
+
+    google_client_id: str | None = None
+    google_client_secret: str | None = None
+    google_redirect_uri: str = "http://localhost:8000/gmail/oauth/callback"
+    # Where the browser lands after the OAuth callback finishes (frontend route, not API).
+    gmail_frontend_return_url: str = "http://localhost:5173/gmail"
+
+    # Symmetric key (Fernet) for encrypting Gmail OAuth tokens at rest — these are live
+    # credentials to a real inbox, more sensitive than anything else this app stores, so
+    # they get defense-in-depth beyond "just another DB column". Generate with:
+    # python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    token_encryption_key: str | None = None
+
+    gmail_sync_window_days: int = 180
+    gmail_fetch_concurrency: int = 4
+    gmail_fetch_timeout_seconds: float = 15.0
+
+    # USAJobs' official public API (data.usajobs.gov) requires a free registered key and
+    # the requester's own contact email as User-Agent — see app.career.boards. Greenhouse/
+    # Lever/Ashby need no key at all (public, unauthenticated job-board APIs).
+    usajobs_api_key: str | None = None
+    usajobs_user_agent_email: str | None = None
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
