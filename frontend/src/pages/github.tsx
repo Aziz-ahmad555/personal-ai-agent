@@ -5,6 +5,9 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { ErrorState } from '@/components/layout/error-state'
 import { ConnectPrompt } from '@/features/github/ConnectPrompt'
 import { ConnectionCard } from '@/features/github/ConnectionCard'
+import { ProposalsSection } from '@/features/github/ProposalsSection'
+import { RepoList } from '@/features/github/RepoList'
+import { SyncCard } from '@/features/github/SyncCard'
 import { useGithubConnection } from '@/features/github/hooks'
 
 export function GithubPage() {
@@ -58,7 +61,12 @@ export function GithubPage() {
       {!isLoading && !isError && connection?.status === 'disconnected' && <ConnectPrompt reconnect />}
 
       {!isLoading && !isError && connection && connection.status !== 'disconnected' && (
-        <ConnectionCard connection={connection} />
+        <>
+          <ConnectionCard connection={connection} />
+          <SyncCard connection={connection} />
+          <ProposalsSection />
+          <RepoList />
+        </>
       )}
     </div>
   )

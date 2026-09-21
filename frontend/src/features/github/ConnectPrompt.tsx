@@ -27,7 +27,11 @@ export function ConnectPrompt({ reconnect = false }: { reconnect?: boolean }) {
             <div>
               <p className="font-medium text-foreground">It can</p>
               <ul className="list-disc space-y-1 pl-4">
-                <li>Read your profile and your public repositories.</li>
+                <li>
+                  Read your profile and your own public repositories: languages, dependency files,
+                  commits attributed to you, and recent public activity.
+                </li>
+                <li>Suggest skills those repositories evidence. You decide on each one.</li>
               </ul>
             </div>
             <div>
@@ -35,14 +39,16 @@ export function ConnectPrompt({ reconnect = false }: { reconnect?: boolean }) {
               <ul className="list-disc space-y-1 pl-4">
                 <li>Write anything: no commits, issues, comments, stars, forks or settings.</li>
                 <li>See private repositories, organisations you belong to, or your email address.</li>
-                <li>Act on its own: connecting and disconnecting are the only things that happen here.</li>
+                <li>
+                  Act on its own: it reads only when you click Sync now, and adds nothing to your profile
+                  until you accept it.
+                </li>
               </ul>
             </div>
             <p>You can disconnect at any time. That revokes the token on GitHub and clears it here.</p>
             <p className="rounded-md bg-muted p-3">
-              <span className="font-medium text-foreground">Not built yet:</span> importing your
-              repositories as profile evidence, and the recruiter-readiness review. For now, connecting
-              only links your account.
+              <span className="font-medium text-foreground">Not built yet:</span> the
+              recruiter-readiness review of your repositories.
             </p>
           </div>
         </div>

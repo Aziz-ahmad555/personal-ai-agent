@@ -1,49 +1,11 @@
-import { MemoryRouter } from 'react-router-dom'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { GithubConnection, Integration } from '@/lib/api'
+import type { Integration } from '@/lib/api'
 import { accessSummary } from '@/features/github/access'
+import { CONNECTION, json, renderAt, stubApi } from '@/features/github/test-utils'
 import { GithubPage } from '@/pages/github'
 import { IntegrationsPage } from '@/pages/integrations'
 import { useAuthStore } from '@/stores/auth'
-
-const CONNECTION: GithubConnection = {
-  id: 'c1',
-  github_login: 'aziz-ahmad555',
-  status: 'connected',
-  installations: [],
-  last_error: null,
-  created_at: '2026-09-22T10:00:00Z',
-}
-
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
-}
-
-/** Routes by path suffix; anything unlisted is a test bug, so it fails loudly. */
-function stubApi(routes: Record<string, (init?: RequestInit) => Response>) {
-  const calls: { path: string; method: string }[] = []
-  vi.stubGlobal(
-    'fetch',
-    vi.fn(async (url: string, init?: RequestInit) => {
-      const path = Object.keys(routes).find((key) => url.endsWith(key))
-      calls.push({ path: path ?? url, method: init?.method ?? 'GET' })
-      if (!path) throw new Error(`Unexpected request: ${url}`)
-      return routes[path](init)
-    })
-  )
-  return calls
-}
-
-function renderAt(ui: React.ReactElement, url = '/github') {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  return render(
-    <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={[url]}>{ui}</MemoryRouter>
-    </QueryClientProvider>
-  )
-}
 
 beforeEach(() => {
   useAuthStore.setState({ accessToken: 'token' })
@@ -90,6 +52,7 @@ describe('GithubPage', () => {
     renderAt(<GithubPage />)
 
     expect(await screen.findByText('Not built yet:')).toBeInTheDocument()
+    expect(screen.getByText(/recruiter-readiness review/)).toBeInTheDocument()
   })
 
   it('shows the connected account, its status and what it can reach', async () => {

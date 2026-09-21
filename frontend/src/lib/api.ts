@@ -475,6 +475,91 @@ export interface GithubDisconnectResult {
   revoked_at_github: boolean
 }
 
+export type GithubSyncStatus = 'pending' | 'running' | 'completed' | 'failed'
+
+export interface GithubActivity {
+  events_seen: number
+  push_events: number
+  active_days: number
+  first_day: string | null
+  last_day: string | null
+  note: string
+  as_of: string
+}
+
+export interface GithubSyncRun {
+  id: string
+  status: GithubSyncStatus
+  started_at: string
+  completed_at: string | null
+  repos_seen: number
+  repos_detailed: number
+  requests_made: number
+  activity: GithubActivity | null
+  warnings: string[]
+  skipped: { subject: string; reason: string }[]
+  error: string | null
+}
+
+export interface GithubRepo {
+  id: string
+  name: string
+  full_name: string
+  html_url: string
+  description: string | null
+  is_fork: boolean
+  is_archived: boolean
+  primary_language: string | null
+  topics: string[]
+  stars: number
+  forks: number
+  license_spdx: string | null
+  pushed_at: string | null
+  details_fetched: boolean
+  languages: Record<string, number>
+  /** null means "not looked up", which is different from 0. */
+  authored_commits: number | null
+  first_commit_at: string | null
+  last_commit_at: string | null
+  dependencies: { skill: string; file: string; url: string }[]
+  synced_at: string
+}
+
+export type GithubAttribution = 'attributed' | 'ownership_only' | 'unknown'
+
+export interface GithubContribution {
+  repo: string
+  repo_url: string
+  via: 'language' | 'dependency' | 'file'
+  source_url: string
+  source_file: string | null
+  bytes: number | null
+  commits: number | null
+  last_commit_at: string | null
+  attribution: GithubAttribution
+}
+
+export interface GithubProposal {
+  id: string
+  skill_name: string
+  kind: 'language' | 'framework' | 'tool'
+  attribution: GithubAttribution
+  contributions: GithubContribution[]
+  existing_skill_name: string | null
+  existing_level: SkillLevel | null
+  requires_level: boolean
+  evidence_preview: string
+  status: 'pending' | 'accepted' | 'dismissed'
+  decided_at: string | null
+  created_at: string
+}
+
+export interface GithubAcceptResult {
+  proposal: GithubProposal
+  skill_id: string
+  skill_version_id: string
+}
+
 export const githubApi = {
   getConnection(token: string) {
     return apiFetch<GithubConnection>('/github/connection', { headers: authHeaders(token) })
@@ -484,9 +569,34 @@ export const githubApi = {
       headers: authHeaders(token),
     })
   },
-  disconnect(token: string) {
-    return apiFetch<GithubDisconnectResult>('/github/connection', {
+  disconnect(token: string, purgeData = false) {
+    return apiFetch<GithubDisconnectResult>(`/github/connection?purge_data=${purgeData}`, {
       method: 'DELETE',
+      headers: authHeaders(token),
+    })
+  },
+  startSync(token: string) {
+    return apiFetch<GithubSyncRun>('/github/sync', { method: 'POST', headers: authHeaders(token) })
+  },
+  listSyncRuns(token: string) {
+    return apiFetch<GithubSyncRun[]>('/github/sync', { headers: authHeaders(token) })
+  },
+  listRepos(token: string) {
+    return apiFetch<GithubRepo[]>('/github/repos', { headers: authHeaders(token) })
+  },
+  listProposals(token: string) {
+    return apiFetch<GithubProposal[]>('/github/proposals', { headers: authHeaders(token) })
+  },
+  acceptProposal(token: string, id: string, level: SkillLevel | null) {
+    return apiFetch<GithubAcceptResult>(`/github/proposals/${id}/accept`, {
+      method: 'POST',
+      headers: authHeaders(token),
+      body: JSON.stringify({ level }),
+    })
+  },
+  dismissProposal(token: string, id: string) {
+    return apiFetch<GithubProposal>(`/github/proposals/${id}/dismiss`, {
+      method: 'POST',
       headers: authHeaders(token),
     })
   },
