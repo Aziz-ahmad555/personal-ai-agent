@@ -842,3 +842,103 @@ export const applicationsApi = {
     })
   },
 }
+
+// --- Career: resume tailoring ---
+
+export type ResumeStatus = 'running' | 'completed' | 'failed'
+export type ResumeChangeType = 'rewrite' | 'skills_order'
+export type ResumeDecision = 'pending' | 'accepted' | 'rejected'
+
+/** A posting requirement a change speaks to, with its verified quote from the posting. */
+export interface ResumeAddress {
+  requirement: string
+  quote: string
+}
+
+export interface ResumeChange {
+  id: string
+  change_type: ResumeChangeType
+  target_id: string
+  target_label: string
+  before_text: string
+  after_text: string
+  rationale: string
+  addresses: ResumeAddress[]
+  decision: ResumeDecision
+  position: number
+}
+
+/** A skill the posting wants that the profile has no evidence for — shown, never written in. */
+export interface ResumeGap {
+  skill: string
+  kind: 'required' | 'preferred'
+  reason: string
+}
+
+/** A proposal discarded because it added claims the profile doesn't support. */
+export interface ResumeDropped {
+  source: string
+  reason: string
+}
+
+export interface TailoredResume {
+  id: string
+  job_posting_id: string
+  status: ResumeStatus
+  error: string | null
+  /** The profile changed after this draft was made. */
+  is_stale: boolean
+  started_at: string
+  changes: ResumeChange[]
+  gaps: ResumeGap[]
+  dropped: ResumeDropped[]
+  counts: { accepted: number; rejected: number; pending: number }
+  /** The resume as it stands: original wording plus only the accepted changes. */
+  preview_markdown: string
+}
+
+export interface ResumeExport {
+  filename: string
+  markdown: string
+  accepted: number
+  pending: number
+  rejected: number
+}
+
+export const resumesApi = {
+  /** null when no draft exists yet (a 404 here is the normal "not started" state). */
+  async get(token: string, jobId: string): Promise<TailoredResume | null> {
+    try {
+      return await apiFetch<TailoredResume>(`/career/jobs/${jobId}/resume`, {
+        headers: authHeaders(token),
+      })
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 404) return null
+      throw error
+    }
+  },
+  tailor(token: string, jobId: string) {
+    return apiFetch<{ status: string }>(`/career/jobs/${jobId}/tailor`, {
+      method: 'POST',
+      headers: authHeaders(token),
+    })
+  },
+  decide(token: string, resumeId: string, changeId: string, decision: ResumeDecision) {
+    return apiFetch<TailoredResume>(`/career/resumes/${resumeId}/changes/${changeId}/decision`, {
+      method: 'POST',
+      headers: authHeaders(token),
+      body: JSON.stringify({ decision }),
+    })
+  },
+  export(token: string, resumeId: string) {
+    return apiFetch<ResumeExport>(`/career/resumes/${resumeId}/export`, {
+      headers: authHeaders(token),
+    })
+  },
+  delete(token: string, resumeId: string) {
+    return apiFetch<void>(`/career/resumes/${resumeId}`, {
+      method: 'DELETE',
+      headers: authHeaders(token),
+    })
+  },
+}

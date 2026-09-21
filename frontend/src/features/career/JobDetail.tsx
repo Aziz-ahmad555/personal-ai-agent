@@ -10,6 +10,7 @@ import { ApplicationStatusBadge } from '@/features/applications/badges'
 import { useApplications, useTrackJob } from '@/features/applications/hooks'
 import { useMatchJob, useVerifyJob, useVerifyingJobIds } from '@/features/career/hooks'
 import { MatchPanel } from '@/features/career/MatchPanel'
+import { TailorPanel } from '@/features/resume/TailorPanel'
 
 function formatSalary(job: CareerJob): string | null {
   const { salary_min: min, salary_max: max, salary_currency: currency } = job
@@ -211,6 +212,8 @@ export function JobDetail({ job }: JobDetailProps) {
           message={matchJob.error instanceof Error ? matchJob.error.message : 'Failed to start match'}
         />
       )}
+
+      <TailorPanel job={job} />
 
       <VerificationSection job={job} isVerifying={verifyingIds.has(job.id)} />
     </div>
