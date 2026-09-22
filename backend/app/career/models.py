@@ -454,3 +454,96 @@ class CoverLetterParagraph(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+
+PRACTICE_SESSION_STATUSES = (
+    "questions_running",
+    "ready_for_answers",
+    "feedback_running",
+    "completed",
+    "failed",
+)
+PRACTICE_QUESTION_CATEGORIES = ("technical", "behavioral", "situational")
+PRACTICE_REF_TYPES = ("posting_requirement", "profile_experience", "profile_skill")
+PRACTICE_VERDICTS = ("addressed", "partially_addressed", "missed", "unclear")
+
+
+class PracticeSession(Base):
+    """One round of interview practice for a job posting. Unlike JobMatch/TailoredResume/
+    CoverLetter, deliberately many-per-job (practice is meant to be repeated) — see
+    app.career.practice_service for the one-active-session-at-a-time guard. `application_id`
+    is an optional cross-link (e.g. "this was for the Sept 30 interview"); the session itself
+    is always anchored to job_posting_id, which is what its verified requirements and profile
+    evidence are read against.
+
+    Two LLM calls happen across this row's life, each fact-checked the same way cover letters
+    and tailored resumes are (see app.career.practice_verify): one to write questions grounded
+    in the posting's verified requirements or the profile's recorded evidence, and one — after
+    the user answers — to write feedback grounded in the question's own quote/evidence and the
+    user's own answer text. Never a numeric score: verdicts are qualitative and per-question,
+    tallied by plain code, not invented as a percentage the way match scoring's weighted score
+    is (that number is defensible; a made-up interview score wouldn't be)."""
+
+    __tablename__ = "practice_sessions"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    job_posting_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("job_postings.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    application_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("applications.id", ondelete="SET NULL")
+    )
+    status: Mapped[str] = mapped_column(String(20), default="questions_running", nullable=False)
+    error: Mapped[str | None] = mapped_column(Text)
+    # Like JobMatch.started_at: a background task dies with the server, so a run older than
+    # the timeout is reported as failed on read. Reset whenever a new LLM call starts (question
+    # generation, then again for feedback generation) — see app.career.practice_service.
+    started_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    # The verified posting requirements this session's questions could draw on: [{name, kind,
+    # quote}] — the match's, frozen at session-start time, same shape as everywhere else.
+    requirements: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list, nullable=False)
+    # Hash of the base resume this session's questions were grounded against.
+    profile_stamp: Mapped[str | None] = mapped_column(String(64))
+    # Questions the LLM proposed that failed grounding verification: [{question, reason}].
+    dropped: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class PracticeQuestion(Base):
+    """One question, its grounding, and — once the user answers and feedback runs — the
+    verdict. `ref_excerpt` is resolved by our own code from the already-verified requirements/
+    profile pool, never trusted verbatim from the LLM (see app.career.practice_verify) —
+    safer than the cover-letter pattern, where the LLM reproduces its own quote for us to
+    check, because here it never gets the chance to mangle one."""
+
+    __tablename__ = "practice_questions"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    session_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("practice_sessions.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    position: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    category: Mapped[str] = mapped_column(String(20), default="behavioral", nullable=False)
+    ref_type: Mapped[str] = mapped_column(String(20), nullable=False)
+    ref_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    ref_excerpt: Mapped[str] = mapped_column(Text, nullable=False)
+
+    answer_text: Mapped[str | None] = mapped_column(Text)
+    answered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    # Null until feedback has run (or the question was never answered, in which case plain
+    # code — not the LLM — sets "missed" with a fixed message; see practice_service).
+    verdict: Mapped[str | None] = mapped_column(String(20))
+    feedback_text: Mapped[str | None] = mapped_column(Text)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )

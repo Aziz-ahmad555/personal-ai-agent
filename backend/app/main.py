@@ -12,6 +12,7 @@ from app.calendar.sync_router import router as calendar_sync_router
 from app.career.application_router import router as applications_router
 from app.career.ats_router import router as ats_router
 from app.career.cover_router import router as cover_router
+from app.career.practice_router import router as practice_router
 from app.career.resume_router import router as resume_router
 from app.career.router import router as career_router
 from app.config import get_settings
@@ -77,6 +78,7 @@ def create_app() -> FastAPI:
     app.include_router(applications_router)
     app.include_router(resume_router)
     app.include_router(cover_router)
+    app.include_router(practice_router)
     app.include_router(ats_router)
     app.include_router(audit_router)
 
