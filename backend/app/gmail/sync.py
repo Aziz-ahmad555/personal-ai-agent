@@ -39,6 +39,24 @@ logger = get_logger(__name__)
 
 GMAIL_QUERY_EXCLUDE = "-in:spam -in:trash"
 
+# The background task lives inside the server process, so a restart silently kills it. A run
+# still "pending"/"running" long after it started is reported as failed, detected on read —
+# same idiom (and timeout) as app.calendar.sync.is_stalled / app.github.sync.is_stalled.
+SYNC_TIMEOUT = timedelta(minutes=10)
+STALLED_MESSAGE = (
+    "This sync didn't finish — the server was probably restarted while it was running. Try again."
+)
+
+
+def _aware(value: datetime) -> datetime:
+    return value if value.tzinfo else value.replace(tzinfo=UTC)
+
+
+def is_stalled(run: GmailSyncRun, *, now: datetime | None = None) -> bool:
+    if run.status not in ("pending", "running"):
+        return False
+    return (now or datetime.now(UTC)) - _aware(run.started_at) > SYNC_TIMEOUT
+
 
 def build_backfill_query(cutoff: datetime) -> str:
     return f"after:{cutoff.strftime('%Y/%m/%d')} {GMAIL_QUERY_EXCLUDE}"

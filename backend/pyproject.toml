@@ -25,6 +25,7 @@ dependencies = [
     "trafilatura>=1.12,<2.0",
     "langgraph>=0.2,<1.0",
     "cryptography>=43.0,<46.0",
+    "reportlab>=4.2,<5.0",
 ]
 
 [project.optional-dependencies]
@@ -66,5 +67,5 @@ plugins = ["pydantic.mypy"]
 exclude = ["alembic/"]
 
 [[tool.mypy.overrides]]
-module = ["tavily.*", "google.*", "trafilatura.*"]
+module = ["tavily.*", "google.*", "trafilatura.*", "reportlab.*"]
 ignore_missing_imports = true

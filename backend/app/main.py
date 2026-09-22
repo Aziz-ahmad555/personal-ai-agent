@@ -24,6 +24,7 @@ from app.gmail.router import router as gmail_router
 from app.integrations.router import router as integrations_router
 from app.logging import configure_logging, get_logger
 from app.profile.router import router as profile_router
+from app.reporting.router import router as reporting_router
 from app.research.router import router as research_router
 from app.search.router import router as search_router
 
@@ -80,6 +81,7 @@ def create_app() -> FastAPI:
     app.include_router(cover_router)
     app.include_router(practice_router)
     app.include_router(ats_router)
+    app.include_router(reporting_router)
     app.include_router(audit_router)
 
     return app

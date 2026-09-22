@@ -42,6 +42,7 @@ from app.profile.models import (  # noqa: F401 — registers model metadata
     SkillVersion,
     WorkExperience,
 )
+from app.reporting.models import WeeklyDigest  # noqa: F401 — registers model metadata
 from app.research.models import (  # noqa: F401 — registers model metadata
     ResearchClaim,
     ResearchClaimCitation,
