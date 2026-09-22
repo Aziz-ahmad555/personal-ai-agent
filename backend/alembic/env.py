@@ -7,7 +7,11 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from alembic import context
 from app.audit.models import AuditLog  # noqa: F401 — registers model metadata
-from app.calendar.models import CalendarConnection  # noqa: F401 — registers model metadata
+from app.calendar.models import (  # noqa: F401 — registers model metadata
+    CalendarConnection,
+    CalendarEvent,
+    CalendarSyncRun,
+)
 from app.career.models import (  # noqa: F401 — registers model metadata
     EmployerVerification,
     JobBoardFeed,

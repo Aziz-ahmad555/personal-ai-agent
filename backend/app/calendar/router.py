@@ -1,10 +1,10 @@
 """The Calendar connection: OAuth handshake, status, and disconnect.
 
 CAN: read event metadata (title, time, attendees, description) on the user's primary
-calendar, once connected. CANNOT: create, edit, or delete anything on the calendar; read
-any calendar other than "primary"; act without the user clicking "Sync now" (see
-app/calendar/sync.py, sub-step 2) — connecting alone reads nothing beyond the one identity
-call needed to show which account is linked.
+calendar, once connected, and read it in the background only when the user clicks "Sync
+now" (see app/calendar/sync.py). CANNOT: create, edit, or delete anything on the calendar;
+read any calendar other than "primary"; act on its own — connecting alone reads nothing
+beyond the one identity call needed to show which account is linked.
 """
 
 import uuid
@@ -12,16 +12,16 @@ from typing import Annotated
 from urllib.parse import urlencode
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import RedirectResponse
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.audit.service import log_action
 from app.auth.deps import get_current_user
 from app.calendar import oauth
 from app.calendar.client import CalendarApiError, get_primary_calendar
-from app.calendar.models import CalendarConnection
+from app.calendar.models import CalendarConnection, CalendarEvent, CalendarSyncRun
 from app.calendar.schemas import ConnectionRead, DisconnectResult
 from app.config import get_settings
 from app.db import base as db_base
@@ -158,7 +158,10 @@ async def _audit_failure(user_id: uuid.UUID, error: str) -> None:
 async def disconnect(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
+    purge_data: Annotated[bool, Query()] = False,
 ) -> DisconnectResult:
+    """Applications you linked an event to are your own and are never removed here; only the
+    synced event snapshot and sync history are deleted when `purge_data` is set."""
     connection = await _get_connection(db, current_user.id)
 
     revoked = False
@@ -172,13 +175,17 @@ async def disconnect(
     connection.access_token_encrypted = None
     connection.refresh_token_encrypted = None
     connection.token_expires_at = None
+    connection.sync_token = None
+    if purge_data:
+        for model in (CalendarEvent, CalendarSyncRun):
+            await db.execute(delete(model).where(model.connection_id == connection.id))
     await log_action(
         db,
         user_id=current_user.id,
         action="calendar.disconnected",
         risk_level="green",
         summary=f"Disconnected Google Calendar for {connection.google_email}.",
-        evidence={"revoked_at_google": revoked},
+        evidence={"revoked_at_google": revoked, "purged_synced_data": purge_data},
         resource_type="calendar_connection",
         resource_id=connection.id,
     )
