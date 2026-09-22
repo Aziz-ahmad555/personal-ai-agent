@@ -108,13 +108,15 @@ async def _event_read(db: AsyncSession, event: CalendarEvent) -> CalendarEventRe
     if event.application_id:
         row = (
             await db.execute(
-                select(Application.id, JobPosting.title, JobPosting.company_name)
+                select(Application.id, JobPosting.id, JobPosting.title, JobPosting.company_name)
                 .join(JobPosting, Application.job_posting_id == JobPosting.id)
                 .where(Application.id == event.application_id)
             )
         ).first()
         if row:
-            application = LinkedApplication(id=row[0], title=row[1], company_name=row[2])
+            application = LinkedApplication(
+                id=row[0], job_posting_id=row[1], title=row[2], company_name=row[3]
+            )
     return CalendarEventRead(
         id=event.id,
         html_link=event.html_link,

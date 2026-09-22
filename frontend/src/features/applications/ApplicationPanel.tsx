@@ -272,11 +272,19 @@ export function ApplicationPanel({ applicationId, onDeleted }: ApplicationPanelP
           </div>
           <div className="flex flex-wrap items-center gap-3 text-xs">
             <Link
-              to="/career"
+              to={job ? `/career?job=${job.id}` : '/career'}
               className="text-muted-foreground underline-offset-4 hover:underline"
             >
               View the job &amp; its match
             </Link>
+            {job && (
+              <Link
+                to={`/career?job=${job.id}#practice`}
+                className="text-muted-foreground underline-offset-4 hover:underline"
+              >
+                Practice interview questions
+              </Link>
+            )}
             {job?.source_url && (
               <a
                 href={job.source_url}

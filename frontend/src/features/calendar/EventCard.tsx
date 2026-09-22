@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Pencil } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Select } from '@/components/ui/select'
@@ -96,6 +97,15 @@ export function EventCard({ event }: { event: CalendarEvent }) {
           {event.application.company_name ? ` at ${event.application.company_name}` : ''}
           {event.application_match_reason ? ` — ${event.application_match_reason}` : ''}
         </p>
+      )}
+
+      {event.kind === 'interview' && event.application && (
+        <Link
+          to={`/career?job=${event.application.job_posting_id}#practice`}
+          className="text-xs text-muted-foreground underline-offset-4 hover:underline"
+        >
+          Practice for this interview
+        </Link>
       )}
 
       {!editing ? (

@@ -312,7 +312,12 @@ describe('Events', () => {
         json([
           event({
             user_confirmed: true,
-            application: { id: 'app-1', title: 'ML Engineer', company_name: 'Acme Corp' },
+            application: {
+              id: 'app-1',
+              title: 'ML Engineer',
+              company_name: 'Acme Corp',
+              job_posting_id: 'job-1',
+            },
             application_match_reason: 'attendee domain acme.com',
           }),
         ]),
@@ -353,7 +358,18 @@ describe('Events', () => {
           },
         ]),
       '/calendar/events/e1/classify': () =>
-        json(event({ kind: 'other', user_confirmed: true, application: { id: 'app-1', title: 'ML Engineer', company_name: 'Acme Corp' } })),
+        json(
+          event({
+            kind: 'other',
+            user_confirmed: true,
+            application: {
+              id: 'app-1',
+              title: 'ML Engineer',
+              company_name: 'Acme Corp',
+              job_posting_id: 'job-1',
+            },
+          })
+        ),
     })
     renderAt(<CalendarPage />)
 

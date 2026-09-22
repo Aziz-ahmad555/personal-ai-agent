@@ -12,6 +12,7 @@ import { useMatchJob, useVerifyJob, useVerifyingJobIds } from '@/features/career
 import { MatchPanel } from '@/features/career/MatchPanel'
 import { AtsPanel } from '@/features/ats/AtsPanel'
 import { CoverPanel } from '@/features/cover/CoverPanel'
+import { PracticePanel } from '@/features/practice/PracticePanel'
 import { TailorPanel } from '@/features/resume/TailorPanel'
 
 function formatSalary(job: CareerJob): string | null {
@@ -218,6 +219,8 @@ export function JobDetail({ job }: JobDetailProps) {
       <TailorPanel job={job} />
 
       <CoverPanel job={job} />
+
+      <PracticePanel job={job} application={application} />
 
       <AtsPanel job={job} />
 

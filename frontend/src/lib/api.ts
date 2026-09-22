@@ -698,6 +698,7 @@ export interface CalendarLinkedApplication {
   id: string
   title: string | null
   company_name: string | null
+  job_posting_id: string
 }
 
 export interface CalendarEvent {
@@ -747,6 +748,100 @@ export const calendarApi = {
       method: 'POST',
       headers: authHeaders(token),
       body: JSON.stringify({ kind, application_id: applicationId }),
+    })
+  },
+}
+
+// --- Career: interview practice ---
+
+export type PracticeStatus =
+  | 'questions_running'
+  | 'ready_for_answers'
+  | 'feedback_running'
+  | 'completed'
+  | 'failed'
+export type PracticeCategory = 'technical' | 'behavioral' | 'situational'
+export type PracticeRefType = 'posting_requirement' | 'profile_experience' | 'profile_skill'
+export type PracticeVerdict = 'addressed' | 'partially_addressed' | 'missed' | 'unclear'
+
+export interface PracticeQuestion {
+  id: string
+  position: number
+  text: string
+  category: PracticeCategory
+  ref_type: PracticeRefType
+  ref_name: string
+  ref_excerpt: string
+  answer_text: string | null
+  answered_at: string | null
+  verdict: PracticeVerdict | null
+  feedback_text: string | null
+}
+
+export interface PracticeDropped {
+  question: string
+  reason: string
+}
+
+export interface PracticeCounts {
+  addressed: number
+  partially_addressed: number
+  missed: number
+  unclear: number
+  unanswered: number
+}
+
+export interface PracticeSessionSummary {
+  id: string
+  status: PracticeStatus
+  error: string | null
+  started_at: string
+  created_at: string
+  question_count: number
+  counts: PracticeCounts
+}
+
+export interface PracticeSession extends PracticeSessionSummary {
+  job_posting_id: string
+  application_id: string | null
+  questions: PracticeQuestion[]
+  dropped: PracticeDropped[]
+}
+
+export interface PracticeAnswerInput {
+  question_id: string
+  answer_text: string
+}
+
+export const practiceApi = {
+  listSessions(token: string, jobId: string) {
+    return apiFetch<PracticeSessionSummary[]>(`/career/jobs/${jobId}/practice-sessions`, {
+      headers: authHeaders(token),
+    })
+  },
+  start(token: string, jobId: string, applicationId?: string | null) {
+    return apiFetch<{ status: string }>(`/career/jobs/${jobId}/practice-sessions`, {
+      method: 'POST',
+      headers: authHeaders(token),
+      body: JSON.stringify({ application_id: applicationId ?? null }),
+    })
+  },
+  get(token: string, sessionId: string) {
+    return apiFetch<PracticeSession>(`/career/practice-sessions/${sessionId}`, {
+      headers: authHeaders(token),
+    })
+  },
+  submitAnswers(token: string, sessionId: string, answers: PracticeAnswerInput[]) {
+    return apiFetch<{ status: string }>(`/career/practice-sessions/${sessionId}/answers`, {
+      method: 'PATCH',
+      headers: authHeaders(token),
+      body: JSON.stringify({ answers }),
+    })
+  },
+  delete(token: string, sessionId: string) {
+    return apiFetch<void>(`/career/practice-sessions/${sessionId}`, {
+      method: 'DELETE',
+      headers: authHeaders(token),
     })
   },
 }

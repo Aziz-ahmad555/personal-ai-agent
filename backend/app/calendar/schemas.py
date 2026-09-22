@@ -51,6 +51,9 @@ class LinkedApplication(BaseModel):
     id: uuid.UUID
     title: str | None
     company_name: str | None
+    # So the UI can deep-link to this job's page (e.g. to start interview practice) without a
+    # second lookup.
+    job_posting_id: uuid.UUID
 
 
 class CalendarEventRead(BaseModel):
