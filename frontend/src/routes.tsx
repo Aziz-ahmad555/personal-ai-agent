@@ -9,6 +9,7 @@ import { ResearchPage } from '@/pages/research'
 import { SearchPage } from '@/pages/search'
 import { GmailPage } from '@/pages/gmail'
 import { GithubPage } from '@/pages/github'
+import { CalendarPage } from '@/pages/calendar'
 import { IntegrationsPage } from '@/pages/integrations'
 import { CareerPage } from '@/pages/career'
 import { ApplicationsPage } from '@/pages/applications'
@@ -35,6 +36,7 @@ export const router = createBrowserRouter([
       { path: 'applications', element: <ApplicationsPage /> },
       { path: 'integrations', element: <IntegrationsPage /> },
       { path: 'github', element: <GithubPage /> },
+      { path: 'calendar', element: <CalendarPage /> },
     ],
   },
 ])

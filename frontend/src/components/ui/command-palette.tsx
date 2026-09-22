@@ -3,6 +3,7 @@ import { Command } from 'cmdk'
 import { useNavigate } from 'react-router-dom'
 import {
   Briefcase,
+  CalendarDays,
   ClipboardList,
   Github,
   Home,
@@ -97,6 +98,9 @@ export function CommandPalette() {
         </Command.Item>
         <Command.Item onSelect={() => run(() => navigate('/github'))} className={ITEM_CLASS}>
           <Github className="h-4 w-4" /> Go to GitHub
+        </Command.Item>
+        <Command.Item onSelect={() => run(() => navigate('/calendar'))} className={ITEM_CLASS}>
+          <CalendarDays className="h-4 w-4" /> Go to calendar
         </Command.Item>
         <Command.Item onSelect={() => run(() => navigate('/career'))} className={ITEM_CLASS}>
           <Briefcase className="h-4 w-4" /> Go to career

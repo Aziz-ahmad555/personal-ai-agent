@@ -656,6 +656,40 @@ export const githubApi = {
   },
 }
 
+// --- Google Calendar (read-only) ---
+
+export type CalendarConnectionStatus = 'connected' | 'needs_reauth' | 'disconnected'
+
+export interface CalendarConnection {
+  id: string
+  google_email: string
+  status: CalendarConnectionStatus
+  last_error: string | null
+  created_at: string
+}
+
+export interface CalendarDisconnectResult {
+  connection: CalendarConnection
+  revoked_at_google: boolean
+}
+
+export const calendarApi = {
+  getConnection(token: string) {
+    return apiFetch<CalendarConnection>('/calendar/connection', { headers: authHeaders(token) })
+  },
+  oauthStart(token: string) {
+    return apiFetch<{ authorization_url: string }>('/calendar/oauth/start', {
+      headers: authHeaders(token),
+    })
+  },
+  disconnect(token: string) {
+    return apiFetch<CalendarDisconnectResult>('/calendar/connection', {
+      method: 'DELETE',
+      headers: authHeaders(token),
+    })
+  },
+}
+
 export type IntegrationStatus =
   | 'connected'
   | 'needs_reauth'
