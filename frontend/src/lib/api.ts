@@ -673,6 +673,51 @@ export interface CalendarDisconnectResult {
   revoked_at_google: boolean
 }
 
+export type CalendarSyncStatus = 'pending' | 'running' | 'completed' | 'failed'
+
+export interface CalendarSyncRun {
+  id: string
+  status: CalendarSyncStatus
+  started_at: string
+  completed_at: string | null
+  events_seen: number
+  events_stored: number
+  warnings: string[]
+  error: string | null
+}
+
+export type CalendarEventKind = 'interview' | 'deadline' | 'other'
+
+export interface CalendarEventAttendee {
+  email: string | null
+  display_name: string | null
+  response_status: string | null
+}
+
+export interface CalendarLinkedApplication {
+  id: string
+  title: string | null
+  company_name: string | null
+}
+
+export interface CalendarEvent {
+  id: string
+  html_link: string | null
+  summary: string | null
+  description: string | null
+  location: string | null
+  start_at: string | null
+  end_at: string | null
+  is_all_day: boolean
+  organizer_email: string | null
+  attendees: CalendarEventAttendee[]
+  kind: CalendarEventKind
+  match_reason: string | null
+  user_confirmed: boolean
+  application: CalendarLinkedApplication | null
+  application_match_reason: string | null
+}
+
 export const calendarApi = {
   getConnection(token: string) {
     return apiFetch<CalendarConnection>('/calendar/connection', { headers: authHeaders(token) })
@@ -682,10 +727,26 @@ export const calendarApi = {
       headers: authHeaders(token),
     })
   },
-  disconnect(token: string) {
-    return apiFetch<CalendarDisconnectResult>('/calendar/connection', {
+  disconnect(token: string, purgeData = false) {
+    return apiFetch<CalendarDisconnectResult>(`/calendar/connection?purge_data=${purgeData}`, {
       method: 'DELETE',
       headers: authHeaders(token),
+    })
+  },
+  startSync(token: string) {
+    return apiFetch<CalendarSyncRun>('/calendar/sync', { method: 'POST', headers: authHeaders(token) })
+  },
+  listSyncRuns(token: string) {
+    return apiFetch<CalendarSyncRun[]>('/calendar/sync', { headers: authHeaders(token) })
+  },
+  listEvents(token: string) {
+    return apiFetch<CalendarEvent[]>('/calendar/events', { headers: authHeaders(token) })
+  },
+  classifyEvent(token: string, id: string, kind: CalendarEventKind, applicationId: string | null) {
+    return apiFetch<CalendarEvent>(`/calendar/events/${id}/classify`, {
+      method: 'POST',
+      headers: authHeaders(token),
+      body: JSON.stringify({ kind, application_id: applicationId }),
     })
   },
 }

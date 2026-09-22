@@ -31,6 +31,12 @@ export function ConnectPrompt({ reconnect = false }: { reconnect?: boolean }) {
                   Read event titles, times, descriptions and attendees on your primary calendar,
                   once you click Sync now.
                 </li>
+                <li>
+                  Spot events that look like interviews or application deadlines, from keywords in
+                  the title and description, and link one to a tracked application when an
+                  attendee&apos;s email domain or the company name matches. You can always correct or
+                  clear its guess.
+                </li>
               </ul>
             </div>
             <div>
@@ -38,13 +44,13 @@ export function ConnectPrompt({ reconnect = false }: { reconnect?: boolean }) {
               <ul className="list-disc space-y-1 pl-4">
                 <li>Create, edit, or delete anything on your calendar.</li>
                 <li>Read any calendar other than your primary one.</li>
-                <li>Act on its own: connecting alone reads nothing.</li>
+                <li>Act on its own: it reads only when you click Sync now.</li>
               </ul>
             </div>
             <p>You can disconnect at any time. That revokes the token on Google and clears it here.</p>
             <p className="rounded-md bg-muted p-3">
-              <span className="font-medium text-foreground">Not built yet:</span> reading events and
-              spotting interviews or deadlines. For now, connecting only links your account.
+              <span className="font-medium text-foreground">Not built yet:</span> the interview
+              practice mode (generated questions and scored feedback).
             </p>
           </div>
         </div>

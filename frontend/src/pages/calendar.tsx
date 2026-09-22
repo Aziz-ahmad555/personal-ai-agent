@@ -5,6 +5,8 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { ErrorState } from '@/components/layout/error-state'
 import { ConnectPrompt } from '@/features/calendar/ConnectPrompt'
 import { ConnectionCard } from '@/features/calendar/ConnectionCard'
+import { EventsList } from '@/features/calendar/EventsList'
+import { SyncCard } from '@/features/calendar/SyncCard'
 import { useCalendarConnection } from '@/features/calendar/hooks'
 
 export function CalendarPage() {
@@ -58,7 +60,11 @@ export function CalendarPage() {
       {!isLoading && !isError && connection?.status === 'disconnected' && <ConnectPrompt reconnect />}
 
       {!isLoading && !isError && connection && connection.status !== 'disconnected' && (
-        <ConnectionCard connection={connection} />
+        <>
+          <ConnectionCard connection={connection} />
+          <SyncCard connection={connection} />
+          <EventsList />
+        </>
       )}
     </div>
   )
