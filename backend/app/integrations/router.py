@@ -10,6 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.deps import get_current_user
+from app.calendar.models import CalendarConnection
 from app.db.base import get_db
 from app.db.models import User
 from app.github.models import GithubConnection
@@ -58,6 +59,11 @@ async def list_integrations(
             select(GithubConnection).where(GithubConnection.user_id == current_user.id)
         )
     ).scalar_one_or_none()
+    calendar = (
+        await db.execute(
+            select(CalendarConnection).where(CalendarConnection.user_id == current_user.id)
+        )
+    ).scalar_one_or_none()
 
     entries = [
         IntegrationRead(
@@ -74,6 +80,14 @@ async def list_integrations(
             status=gmail.status if gmail else "not_connected",
             summary="Read-only access to your mail.",
             path="/gmail",
+        ),
+        IntegrationRead(
+            key="calendar",
+            label="Calendar",
+            status=calendar.status if calendar else "not_connected",
+            summary="Read-only access to your primary Google Calendar, for interview and "
+            "deadline detection.",
+            path="/calendar",
         ),
     ]
     entries.extend(

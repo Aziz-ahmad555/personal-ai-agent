@@ -7,7 +7,9 @@ import jwt
 
 from app.config import get_settings
 
-TokenType = Literal["access", "refresh", "oauth_state", "github_oauth_state"]
+TokenType = Literal[
+    "access", "refresh", "oauth_state", "github_oauth_state", "calendar_oauth_state"
+]
 
 
 def hash_password(plain_password: str) -> str:

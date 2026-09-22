@@ -64,6 +64,12 @@ class Settings(BaseSettings):
     github_redirect_uri: str = "http://localhost:8000/github/oauth/callback"
     github_frontend_return_url: str = "http://localhost:5173/github"
 
+    # Google Calendar (read-only). Same Google Cloud project/client as Gmail
+    # (google_client_id/secret above) — just its own redirect and scope, so it's a
+    # separate, independently revocable grant. See app/calendar/oauth.py.
+    google_calendar_redirect_uri: str = "http://localhost:8000/calendar/oauth/callback"
+    calendar_frontend_return_url: str = "http://localhost:5173/calendar"
+
     gmail_sync_window_days: int = 180
     gmail_fetch_concurrency: int = 4
     gmail_fetch_timeout_seconds: float = 15.0
