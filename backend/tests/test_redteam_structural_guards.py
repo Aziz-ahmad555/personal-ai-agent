@@ -10,13 +10,14 @@ from pathlib import Path
 APP_ROOT = Path(__file__).resolve().parent.parent / "app"
 
 # The one place any LLM SDK client is constructed, by design (app.research.llm's
-# GeminiLLMProvider/AnthropicLLMProvider) — both wrap generate_structured, a schema-constrained
-# JSON-in/JSON-out call with no side-effecting tool ever bound to it (Anthropic's "tool use" is
-# used purely as a JSON-shaping trick; nothing in the app executes what a model puts in a tool
-# call). If any other module starts constructing a client directly, that's a new, unreviewed
-# path for a model's output to reach something other than a JSON payload our own code verifies.
+# GeminiLLMProvider/AnthropicLLMProvider/GroqLLMProvider) — all three wrap generate_structured,
+# a schema-constrained JSON-in/JSON-out call with no side-effecting tool ever bound to it
+# (Anthropic's and Groq's "tool use" is used purely as a JSON-shaping trick; nothing in the app
+# executes what a model puts in a tool call). If any other module starts constructing a client
+# directly, that's a new, unreviewed path for a model's output to reach something other than a
+# JSON payload our own code verifies.
 _ALLOWED_LLM_CLIENT_FILE = APP_ROOT / "research" / "llm.py"
-_LLM_CLIENT_PATTERNS = ("genai.Client(", "AsyncAnthropic(")
+_LLM_CLIENT_PATTERNS = ("genai.Client(", "AsyncAnthropic(", "AsyncGroq(")
 
 
 def test_no_llm_sdk_client_is_constructed_outside_the_one_sanctioned_module() -> None:
@@ -37,9 +38,9 @@ def test_no_llm_sdk_client_is_constructed_outside_the_one_sanctioned_module() ->
 
 
 def test_no_llm_call_site_binds_an_executable_tool() -> None:
-    """generate_structured's own two implementations are allowed to mention "tool" (Anthropic's
-    provider genuinely uses forced tool-use as a JSON-shaping trick) — what must never appear
-    anywhere else is a tool/function definition wired to something that actually runs."""
+    """generate_structured's own implementations are allowed to mention "tool" (Anthropic's and
+    Groq's providers genuinely use forced tool-use as a JSON-shaping trick) — what must never
+    appear anywhere else is a tool/function definition wired to something that actually runs."""
     offenders = []
     for path in APP_ROOT.rglob("*.py"):
         if path == _ALLOWED_LLM_CLIENT_FILE:

@@ -158,6 +158,98 @@ class AnthropicLLMProvider:
         raise LLMError("Anthropic response did not include the expected tool_use block.")
 
 
+class GroqLLMProvider:
+    """Groq's API is OpenAI-compatible (chat completions + function/tool calling), not
+    Gemini's or Anthropic's own shapes. Uses forced tool-use as the structured-output
+    mechanism — the same JSON-shaping trick AnthropicLLMProvider already uses in this file
+    — rather than Groq's looser `response_format: json_object` mode, which only guarantees
+    valid JSON, not conformance to our schema."""
+
+    def __init__(self, api_key: str, model: str) -> None:
+        from groq import AsyncGroq
+
+        self._client = AsyncGroq(api_key=api_key)
+        self._model = model
+
+    async def generate_structured(
+        self,
+        *,
+        system: str,
+        user_message: str,
+        schema_name: str,
+        schema_description: str,
+        json_schema: dict[str, Any],
+        max_tokens: int,
+    ) -> dict[str, Any]:
+        from groq import APIConnectionError, APIStatusError
+
+        attempt = 0
+        while True:
+            attempt += 1
+            try:
+                response = await self._client.chat.completions.create(
+                    model=self._model,
+                    max_tokens=max_tokens,
+                    messages=[
+                        {"role": "system", "content": system},
+                        {"role": "user", "content": user_message},
+                    ],
+                    tools=[
+                        {
+                            "type": "function",
+                            "function": {
+                                "name": schema_name,
+                                "description": schema_description,
+                                "parameters": json_schema,
+                            },
+                        }
+                    ],
+                    tool_choice={"type": "function", "function": {"name": schema_name}},
+                )
+                break
+            except Exception as exc:
+                # A connection-level failure (no response at all) has no status_code to
+                # check — treated the same as a transient 5xx, since retrying is the right
+                # move either way. Anything else (bad request, auth, a real APIStatusError
+                # with a non-transient code) is not something waiting can fix.
+                if isinstance(exc, APIConnectionError):
+                    transient = True
+                elif isinstance(exc, APIStatusError):
+                    transient = exc.status_code in _TRANSIENT_STATUS_CODES
+                else:
+                    transient = False
+                if not transient or attempt >= _MAX_RETRY_ATTEMPTS:
+                    logger.warning(
+                        "groq_generate_failed",
+                        schema_name=schema_name,
+                        attempts=attempt,
+                        error=str(exc),
+                    )
+                    raise LLMError(f"Groq call failed: {exc}") from exc
+                delay = _RETRY_BASE_DELAY_SECONDS * (2 ** (attempt - 1))
+                logger.warning(
+                    "groq_transient_error_retrying",
+                    schema_name=schema_name,
+                    attempt=attempt,
+                    delay_seconds=delay,
+                    error=str(exc),
+                )
+                await asyncio.sleep(delay)
+
+        message = response.choices[0].message
+        tool_calls = message.tool_calls or []
+        for call in tool_calls:
+            if call.function.name == schema_name:
+                try:
+                    return cast(dict[str, Any], json.loads(call.function.arguments))
+                except json.JSONDecodeError as exc:
+                    raise LLMError(
+                        f"Groq returned tool-call arguments that weren't valid JSON: {exc}"
+                    ) from exc
+
+        raise LLMError("Groq response did not include the expected tool call.")
+
+
 def get_llm_provider(settings: Settings) -> LLMProvider:
     if settings.llm_provider == "gemini":
         if not settings.gemini_api_key:
@@ -176,5 +268,13 @@ def get_llm_provider(settings: Settings) -> LLMProvider:
         return AnthropicLLMProvider(
             api_key=settings.anthropic_api_key, model=settings.anthropic_model
         )
+
+    if settings.llm_provider == "groq":
+        if not settings.groq_api_key:
+            raise LLMError(
+                "GROQ_API_KEY is not set — the Research Engine cannot extract claims or "
+                "draft a report without it. Add it to .env."
+            )
+        return GroqLLMProvider(api_key=settings.groq_api_key, model=settings.groq_model)
 
     raise LLMError(f"Unknown LLM_PROVIDER setting: {settings.llm_provider!r}")

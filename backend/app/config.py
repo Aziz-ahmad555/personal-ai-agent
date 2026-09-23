@@ -37,14 +37,21 @@ class Settings(BaseSettings):
     tavily_api_key: str | None = None
 
     # Which LLM backs claim extraction/report drafting — swappable without touching
-    # pipeline logic (see app.research.llm.LLMProvider). "gemini" | "anthropic".
-    llm_provider: str = "gemini"
+    # pipeline logic (see app.research.llm.LLMProvider). "gemini" | "anthropic" | "groq".
+    # Default is groq: Gemini's free-tier quota (a hard 20 requests/day at the time this was
+    # last changed) proved too tight for real use, on top of a same-day 5-req/minute wall and
+    # sustained server overload — Groq's free tier is far more generous. Easy to switch back
+    # via this one setting if Groq shows its own problems in practice.
+    llm_provider: str = "groq"
 
     anthropic_api_key: str | None = None
     anthropic_model: str = "claude-haiku-4-5-20251001"
 
     gemini_api_key: str | None = None
     gemini_model: str = "gemini-3.6-flash"
+
+    groq_api_key: str | None = None
+    groq_model: str = "openai/gpt-oss-120b"
 
     research_max_sources_per_query: int = 8
     research_fetch_timeout_seconds: float = 15.0
