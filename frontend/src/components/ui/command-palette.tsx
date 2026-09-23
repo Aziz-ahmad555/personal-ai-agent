@@ -5,6 +5,7 @@ import {
   Briefcase,
   CalendarDays,
   ClipboardList,
+  FileText,
   Github,
   Home,
   LayoutDashboard,
@@ -107,6 +108,9 @@ export function CommandPalette() {
         </Command.Item>
         <Command.Item onSelect={() => run(() => navigate('/applications'))} className={ITEM_CLASS}>
           <ClipboardList className="h-4 w-4" /> Go to applications
+        </Command.Item>
+        <Command.Item onSelect={() => run(() => navigate('/digest'))} className={ITEM_CLASS}>
+          <FileText className="h-4 w-4" /> Go to weekly digest
         </Command.Item>
         <Command.Item onSelect={() => run(toggleTheme)} className={ITEM_CLASS}>
           {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}

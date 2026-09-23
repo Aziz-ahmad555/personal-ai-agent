@@ -1536,3 +1536,173 @@ export const atsApi = {
     return apiFetch<AtsSafeExport>(`/career/jobs/${jobId}/ats-safe`, { headers: authHeaders(token) })
   },
 }
+
+// --- Reporting: weekly digest ---
+
+/** A job/company reference reused across every digest section. */
+export interface DigestJobRef {
+  id: string
+  title: string | null
+  company_name: string | null
+}
+
+export interface DigestCountedList<T> {
+  count: number
+  items: T[]
+}
+
+export interface DigestMatchItem extends DigestJobRef {
+  score_percent: number | null
+  low_confidence: boolean
+}
+
+export interface DigestStatusChangeItem extends DigestJobRef {
+  from_status: string | null
+  to_status: string | null
+}
+
+export interface DigestPracticeTally {
+  addressed: number
+  partially_addressed: number
+  missed: number
+  unclear: number
+  unanswered: number
+}
+
+export interface DigestCareerSection {
+  jobs_discovered: DigestCountedList<DigestJobRef>
+  matches_computed: DigestCountedList<DigestMatchItem>
+  high_risk_postings: DigestCountedList<DigestJobRef>
+  application_status_changes: {
+    count: number
+    by_status: Record<string, number>
+    items: DigestStatusChangeItem[]
+  }
+  cover_letters_drafted: DigestCountedList<DigestJobRef>
+  resumes_drafted: DigestCountedList<DigestJobRef>
+  practice_sessions: DigestCountedList<DigestJobRef> & { verdict_tally: DigestPracticeTally }
+}
+
+export interface DigestResearchQueryItem {
+  id: string
+  query_text: string
+  status: string
+}
+
+export interface DigestResearchSection {
+  queries_run: DigestCountedList<DigestResearchQueryItem>
+  queries_completed: { count: number }
+  claims_added: { count: number; by_status: Record<string, number> }
+}
+
+export type DigestGmailSection =
+  | { connected: false }
+  | {
+      connected: true
+      status: string
+      messages_synced: { count: number }
+      unread_count: number
+    }
+
+export type DigestGithubSection =
+  | { connected: false }
+  | {
+      connected: true
+      status: string
+      repos_synced: { count: number }
+      pending_proposals: { count: number }
+      readiness: { passed: number; total: number; synced: boolean }
+    }
+
+export interface DigestCalendarEventItem {
+  summary: string | null
+  start_at: string | null
+  is_all_day: boolean
+  job: DigestJobRef | null
+}
+
+export type DigestCalendarSection =
+  | { connected: false }
+  | {
+      connected: true
+      status: string
+      upcoming_interviews: DigestCalendarEventItem[]
+      upcoming_deadlines: DigestCalendarEventItem[]
+    }
+
+export interface DigestStalledRun {
+  kind: string
+  integration?: string
+  id?: string
+  title?: string | null
+  company_name?: string | null
+}
+
+export interface DigestAttentionSection {
+  follow_ups_overdue: (DigestJobRef & { next_action_text: string | null })[]
+  follow_ups_due_today: (DigestJobRef & { next_action_text: string | null })[]
+  stale_matches: DigestJobRef[]
+  stale_resumes: DigestJobRef[]
+  stale_cover_letters: DigestJobRef[]
+  stalled_runs: DigestStalledRun[]
+  connections_needing_reauth: string[]
+  pending_audit_approvals: { count: number }
+  pending_skill_proposals: { count: number }
+}
+
+export interface DigestData {
+  period: { start: string; end: string }
+  generated_at: string
+  career: DigestCareerSection
+  research: DigestResearchSection
+  gmail: DigestGmailSection
+  github: DigestGithubSection
+  calendar: DigestCalendarSection
+  attention: DigestAttentionSection
+}
+
+export interface WeeklyDigestSummary {
+  id: string
+  period_start: string
+  period_end: string
+  generated_at: string
+}
+
+export interface WeeklyDigest extends WeeklyDigestSummary {
+  data: DigestData
+}
+
+export const reportingApi = {
+  listDigests(token: string) {
+    return apiFetch<WeeklyDigestSummary[]>('/reporting/digests', { headers: authHeaders(token) })
+  },
+  generateDigest(token: string, days = 7, lookaheadDays = 14) {
+    return apiFetch<WeeklyDigest>('/reporting/digests', {
+      method: 'POST',
+      headers: authHeaders(token),
+      body: JSON.stringify({ days, lookahead_days: lookaheadDays }),
+    })
+  },
+  getDigest(token: string, id: string) {
+    return apiFetch<WeeklyDigest>(`/reporting/digests/${id}`, { headers: authHeaders(token) })
+  },
+  deleteDigest(token: string, id: string) {
+    return apiFetch<void>(`/reporting/digests/${id}`, {
+      method: 'DELETE',
+      headers: authHeaders(token),
+    })
+  },
+  /** The export endpoint needs the auth header, so it can't be a plain download link — fetch
+   * the PDF as a blob and let the caller trigger the save. */
+  async downloadDigest(token: string, id: string): Promise<{ blob: Blob; filename: string }> {
+    const response = await fetch(`${API_URL}/reporting/digests/${id}/export`, {
+      headers: authHeaders(token),
+    })
+    if (!response.ok) {
+      throw new ApiError(response.status, await parseErrorDetail(response))
+    }
+    const disposition = response.headers.get('Content-Disposition') ?? ''
+    const filename = /filename="([^"]+)"/.exec(disposition)?.[1] ?? 'weekly-digest.pdf'
+    return { blob: await response.blob(), filename }
+  },
+}

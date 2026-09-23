@@ -13,6 +13,7 @@ import { CalendarPage } from '@/pages/calendar'
 import { IntegrationsPage } from '@/pages/integrations'
 import { CareerPage } from '@/pages/career'
 import { ApplicationsPage } from '@/pages/applications'
+import { DigestPage } from '@/pages/digest'
 
 export const router = createBrowserRouter([
   {
@@ -37,6 +38,7 @@ export const router = createBrowserRouter([
       { path: 'integrations', element: <IntegrationsPage /> },
       { path: 'github', element: <GithubPage /> },
       { path: 'calendar', element: <CalendarPage /> },
+      { path: 'digest', element: <DigestPage /> },
     ],
   },
 ])
