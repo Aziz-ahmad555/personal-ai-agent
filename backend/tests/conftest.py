@@ -8,6 +8,12 @@ os.environ.setdefault("GOOGLE_CLIENT_ID", "test-client-id.apps.googleusercontent
 os.environ.setdefault("GOOGLE_CLIENT_SECRET", "test-client-secret")
 os.environ.setdefault("GITHUB_CLIENT_ID", "test-github-client-id")
 os.environ.setdefault("GITHUB_CLIENT_SECRET", "test-github-client-secret")
+# The rate limiter (app.core.rate_limit) needs a `limits` storage backend at import time.
+# `memory://` gives the suite the real limiting logic (not mocked) with no live Redis
+# dependency — same reasoning as DATABASE_URL being sqlite in-memory above. Deliberately a
+# separate env var from REDIS_URL: app.core.health's real redis-py client doesn't understand
+# the `memory://` pseudo-scheme and would raise before its own try/except could catch it.
+os.environ.setdefault("RATE_LIMIT_STORAGE_URI", "memory://")
 
 import pytest  # noqa: E402
 from httpx import ASGITransport, AsyncClient  # noqa: E402
@@ -18,6 +24,7 @@ from sqlalchemy.ext.asyncio import (  # noqa: E402
 )
 from sqlalchemy.pool import StaticPool  # noqa: E402
 
+from app.core.rate_limit import limiter  # noqa: E402
 from app.db import base as db_base  # noqa: E402
 from app.db.base import Base, get_db  # noqa: E402
 from app.main import app  # noqa: E402
@@ -42,6 +49,16 @@ app.dependency_overrides[get_db] = _override_get_db
 # directly instead. Point that at the same in-memory test database so background work in
 # tests reads/writes the tables _setup_db actually created, not the production engine.
 db_base.async_session_factory = TestSessionFactory
+
+
+@pytest.fixture(autouse=True)
+def _reset_rate_limiter() -> None:
+    """The limiter's in-memory storage is a module-level singleton (app.core.rate_limit.limiter),
+    so without this, register/login calls in one test would count against the limit in the
+    next one — every test using the `auth_headers` fixture would eventually start failing with
+    429 instead of the login/register behavior it actually means to exercise. Real Redis-backed
+    production use has no equivalent problem since each real client already has its own IP."""
+    limiter.reset()
 
 
 @pytest.fixture(autouse=True)

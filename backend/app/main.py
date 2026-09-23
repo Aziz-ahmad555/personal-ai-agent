@@ -4,6 +4,9 @@ from collections.abc import Awaitable, Callable
 
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 
 from app.audit.router import router as audit_router
 from app.auth.router import router as auth_router
@@ -17,6 +20,7 @@ from app.career.resume_router import router as resume_router
 from app.career.router import router as career_router
 from app.config import get_settings
 from app.core.health import router as health_router
+from app.core.rate_limit import limiter
 from app.github.readiness_router import router as github_readiness_router
 from app.github.router import router as github_router
 from app.github.sync_router import router as github_sync_router
@@ -35,6 +39,11 @@ logger = get_logger(__name__)
 def create_app() -> FastAPI:
     settings = get_settings()
     app = FastAPI(title="Personal AI Agent API", version="0.1.0")
+
+    app.state.limiter = limiter
+    # slowapi's handler predates Starlette's generic Request/Response typing.
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
+    app.add_middleware(SlowAPIMiddleware)
 
     app.add_middleware(
         CORSMiddleware,

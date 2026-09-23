@@ -1,7 +1,9 @@
 """Red-team Track A, item 4: JWT and token-handling attacks. Confirms what already holds
-(tamper/expiry rejection, token-type confusion) and documents two real, unfixed gaps —
-refresh-token reuse and no login rate limiting — as design-decision items rather than silently
-patching them (both change real behavior: token statefulness, a new dependency)."""
+(tamper/expiry rejection, token-type confusion) and documents one real, deliberately unfixed
+gap — refresh-token reuse (see app.auth.router.refresh's docstring) — as a design-decision item
+rather than silently patching it (it would need real statefulness this scheme doesn't have
+today). The other gap this track originally found here, no login rate limiting, has since been
+fixed — see tests/test_rate_limit.py for that coverage."""
 
 import uuid
 from datetime import UTC, datetime, timedelta
@@ -91,11 +93,12 @@ async def test_an_oauth_state_token_cannot_be_used_as_an_access_token(client: As
 
 
 async def test_FINDING_a_refresh_token_is_reusable_after_being_used(client: AsyncClient) -> None:
-    """Documented gap, not fixed here (flagged to the user as a design-decision item — a real
-    fix means tracking issued/used refresh tokens, adding statefulness to what's currently a
-    fully stateless JWT scheme): using a refresh token to mint a new pair does not invalidate
-    the refresh token that was just used. The same token can be replayed until its own 14-day
-    expiry, which is the textbook definition of *not* having refresh-token rotation."""
+    """Documented gap, deliberately left as-is (user decision, 2026-09-23 — see the docstring
+    on app.auth.router.refresh for the full reasoning): using a refresh token to mint a new pair
+    does not invalidate the refresh token that was just used. The same token can be replayed
+    until its own 14-day expiry, which is the textbook definition of *not* having refresh-token
+    rotation. Accepted for now under this app's single-user/local-only threat model; MUST be
+    revisited before any public or production deployment."""
     tokens = await _register_and_login(client)
     refresh_token = tokens["refresh_token"]
 
@@ -109,19 +112,3 @@ async def test_FINDING_a_refresh_token_is_reusable_after_being_used(client: Asyn
     assert second_use.status_code == 200
 
 
-async def test_FINDING_login_has_no_rate_limit_or_lockout(client: AsyncClient) -> None:
-    """Documented gap, not fixed here (flagged to the user — a real fix needs a rate-limiting
-    dependency and a policy decision on thresholds/lockout duration): /auth/login accepts
-    unlimited attempts against the single owner account with no throttling or lockout."""
-    await client.post("/auth/register", json=REGISTER_PAYLOAD)
-
-    statuses = []
-    for _ in range(15):
-        response = await client.post(
-            "/auth/login",
-            data={"username": REGISTER_PAYLOAD["email"], "password": "wrong-guess"},
-        )
-        statuses.append(response.status_code)
-
-    # Today's actual behavior: every attempt is treated identically — no 429, no lockout.
-    assert statuses == [401] * 15

@@ -17,6 +17,13 @@ class Settings(BaseSettings):
     database_url: str
     redis_url: str = "redis://localhost:6379/0"
 
+    # Storage backend for the login rate limiter (app.core.rate_limit), via the `limits`
+    # library. Defaults to reusing redis_url in production. Kept as a separate field (not just
+    # reusing redis_url everywhere) so tests can point it at `memory://` — a `limits`-specific
+    # pseudo-scheme slowapi understands but redis-py's real client (app.core.health) does not —
+    # without touching redis_url, which the health check still resolves through the real client.
+    rate_limit_storage_uri: str | None = None
+
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
     refresh_token_expire_days: int = 14
@@ -79,6 +86,10 @@ class Settings(BaseSettings):
     # Lever/Ashby need no key at all (public, unauthenticated job-board APIs).
     usajobs_api_key: str | None = None
     usajobs_user_agent_email: str | None = None
+
+    @property
+    def effective_rate_limit_storage_uri(self) -> str:
+        return self.rate_limit_storage_uri or self.redis_url
 
     @property
     def cors_origin_list(self) -> list[str]:
