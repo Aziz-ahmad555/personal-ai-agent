@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { ThemeToggle } from '@/components/layout/theme-toggle'
 import { CommandPalette } from '@/components/ui/command-palette'
+import { ReauthBanner } from '@/components/layout/reauth-banner'
 import { useAuthStore } from '@/stores/auth'
 
 const NAV_ITEMS = [
@@ -70,6 +71,7 @@ export function AppShell() {
           )}
         </div>
       </header>
+      <ReauthBanner />
       <motion.main
         key={location.pathname}
         initial={{ opacity: 0, y: 4 }}

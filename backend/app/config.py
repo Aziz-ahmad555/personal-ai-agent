@@ -97,13 +97,18 @@ class Settings(BaseSettings):
     # Phase 11, Group A: three already-Green, read-only-or-pure-aggregation actions promoted
     # from "human clicks a button" to "runs on a schedule" (app.core.scheduler). Each interval
     # is independently tunable; the master flag reverts to fully-manual behavior instantly with
-    # no data-model change. Deliberately excludes Gmail/Calendar (their OAuth tokens have real
-    # reauth fragility — a separate, later decision) and anything that could write outside the
-    # user's own local data (no such action exists yet regardless).
+    # no data-model change.
     background_scheduler_enabled: bool = True
     github_sync_interval_hours: int = 24
     job_feed_poll_interval_hours: int = 6
     digest_generation_interval_days: int = 7
+
+    # Phase 11, Group B: Gmail/Calendar sync, added as a separate decision from Group A because
+    # their OAuth tokens have real reauth fragility. Silent-failure surfacing relies on the
+    # weekly digest (Group A) plus a persistent frontend banner — see app.core.scheduler's
+    # module docstring.
+    gmail_sync_interval_hours: int = 6
+    calendar_sync_interval_hours: int = 6
 
     @property
     def effective_rate_limit_storage_uri(self) -> str:

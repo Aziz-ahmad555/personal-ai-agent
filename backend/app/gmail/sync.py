@@ -80,7 +80,9 @@ async def ensure_valid_access_token(db: AsyncSession, connection: GmailConnectio
         raise ReauthRequiredError("Gmail is not connected.")
 
     now = datetime.now(UTC)
-    if connection.token_expires_at and connection.token_expires_at > now + timedelta(minutes=2):
+    if connection.token_expires_at and _aware(connection.token_expires_at) > now + timedelta(
+        minutes=2
+    ):
         return decrypt_token(connection.access_token_encrypted)
 
     refresh_token = decrypt_token(connection.refresh_token_encrypted)

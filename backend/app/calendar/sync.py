@@ -66,7 +66,7 @@ async def start_run(db: AsyncSession, connection_id: uuid.UUID) -> CalendarSyncR
     return run
 
 
-async def run_sync(db: AsyncSession, run_id: uuid.UUID) -> None:
+async def run_sync(db: AsyncSession, run_id: uuid.UUID, *, trigger: str = "manual") -> None:
     run = await db.get(CalendarSyncRun, run_id)
     if run is None:
         logger.warning("calendar_sync_run_not_found", run_id=str(run_id))
@@ -74,7 +74,7 @@ async def run_sync(db: AsyncSession, run_id: uuid.UUID) -> None:
     connection_id = run.connection_id
     connection = await db.get(CalendarConnection, connection_id)
     if connection is None:
-        await _fail(db, run_id, "The Calendar connection no longer exists.")
+        await _fail(db, run_id, "The Calendar connection no longer exists.", trigger=trigger)
         return
 
     run.status = "running"
@@ -84,19 +84,23 @@ async def run_sync(db: AsyncSession, run_id: uuid.UUID) -> None:
     try:
         token = await get_valid_access_token(db, connection)
     except Exception as exc:  # noqa: BLE001 — every failure is reported on the run
-        await _fail(db, run_id, _describe(exc))
+        await _fail(db, run_id, _describe(exc), trigger=trigger)
         return
 
     try:
         async with httpx.AsyncClient(timeout=20.0) as client:
-            await _sync(db, run, connection, client, token)
+            await _sync(db, run, connection, client, token, trigger=trigger)
     except gcal.CalendarAuthError:
         await _fail(
-            db, run_id, "Google rejected the access token — reconnect Calendar.", needs_reauth=True
+            db,
+            run_id,
+            "Google rejected the access token — reconnect Calendar.",
+            needs_reauth=True,
+            trigger=trigger,
         )
     except Exception as exc:  # noqa: BLE001 — a background task must record, not raise
         logger.warning("calendar_sync_failed", error=str(exc))
-        await _fail(db, run_id, _describe(exc))
+        await _fail(db, run_id, _describe(exc), trigger=trigger)
 
 
 def _describe(exc: Exception) -> str:
@@ -111,6 +115,7 @@ async def _fail(
     message: str,
     *,
     needs_reauth: bool = False,
+    trigger: str = "manual",
 ) -> None:
     # Plain values only past this point: a failed flush rolls the session back and expires
     # every object in it, so this must not depend on attributes read before the rollback.
@@ -133,6 +138,7 @@ async def _fail(
             risk_level="green",
             summary="Calendar sync did not complete.",
             error=message,
+            evidence={"trigger": trigger},
             resource_type="calendar_sync_run",
             resource_id=run.id,
         )
@@ -252,6 +258,8 @@ async def _sync(
     connection: CalendarConnection,
     client: httpx.AsyncClient,
     token: str,
+    *,
+    trigger: str = "manual",
 ) -> None:
     candidates = await _application_candidates(db, connection.user_id)
     now = datetime.now(UTC)
@@ -335,6 +343,7 @@ async def _sync(
             "requests_made": requests_made,
             "incremental": incremental,
             "warnings": warnings,
+            "trigger": trigger,
         },
         resource_type="calendar_sync_run",
         resource_id=run.id,
