@@ -39,6 +39,13 @@ logger = get_logger(__name__)
 
 GMAIL_QUERY_EXCLUDE = "-in:spam -in:trash"
 
+# Calendar and GitHub sync both bound their total request count per run (MAX_REQUESTS); Gmail's
+# list-paging loops had no equivalent, found by a red-team pass — an unbounded `while True`
+# paging on `page_token` with no ceiling. Generous on purpose (a legitimate backfill can
+# reasonably need many pages), just enough to stop a truly runaway loop rather than to bound
+# ordinary use.
+MAX_LIST_PAGES = 200
+
 # The background task lives inside the server process, so a restart silently kills it. A run
 # still "pending"/"running" long after it started is reported as failed, detected on read —
 # same idiom (and timeout) as app.calendar.sync.is_stalled / app.github.sync.is_stalled.
@@ -198,7 +205,7 @@ async def _run_backfill(
 
     all_ids: list[str] = []
     page_token: str | None = None
-    while True:
+    for _ in range(MAX_LIST_PAGES):
         ids, page_token = await list_message_ids(
             client, access_token, query=query, page_token=page_token
         )
@@ -207,6 +214,8 @@ async def _run_backfill(
         await db.commit()
         if not page_token:
             break
+    else:
+        logger.warning("gmail_backfill_hit_page_limit", pages=MAX_LIST_PAGES)
 
     await _fetch_and_store_new_messages(
         db, client, connection, access_token, all_ids, sync_run, settings
@@ -229,7 +238,7 @@ async def _run_incremental(
     all_ids: list[str] = []
     page_token: str | None = None
 
-    while True:
+    for _ in range(MAX_LIST_PAGES):
         ids, page_token, too_old = await list_history(
             client, access_token, start_history_id=connection.last_history_id, page_token=page_token
         )
@@ -240,6 +249,8 @@ async def _run_incremental(
         all_ids.extend(ids)
         if not page_token:
             break
+    else:
+        logger.warning("gmail_incremental_hit_page_limit", pages=MAX_LIST_PAGES)
 
     sync_run.messages_fetched = len(all_ids)
     await db.commit()

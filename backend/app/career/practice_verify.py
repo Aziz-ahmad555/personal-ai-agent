@@ -21,7 +21,7 @@ from typing import Any
 
 from app.career.matching import normalize_skill
 from app.career.resume_base import ResumeBase
-from app.career.resume_verify import novel_terms, numbers_in, words_in
+from app.career.resume_verify import mentions_term, novel_terms, numbers_in, words_in
 
 MAX_RATIONALE_CHARS = 400
 QUESTION_CATEGORIES = ("technical", "behavioral", "situational")
@@ -99,10 +99,23 @@ def verify_question(
     }, None
 
 
-def verify_feedback_item(raw: Any, *, ref_excerpt: str, answer_text: str) -> tuple[str, str] | None:
+def verify_feedback_item(
+    raw: Any, *, ref_type: str, ref_name: str, ref_excerpt: str, answer_text: str
+) -> tuple[str, str] | None:
     """Returns (verdict, rationale) if the feedback may be shown, or None if it must fall back to
     a fixed, honest message instead of a guess. The rationale may only draw on the question's own
-    grounding excerpt and the candidate's own answer — nothing else counts as known."""
+    grounding excerpt and the candidate's own answer — nothing else counts as known.
+
+    That vocabulary check alone isn't enough for a *positive* verdict, though: `ref_excerpt`
+    always mentions the thing being asked about, regardless of what the candidate actually
+    said, so crediting "addressed"/"partially_addressed" on vocabulary alone can credit a claim
+    the answer never made (caught by a red-team test — see test_redteam_injection.py). For a
+    `posting_requirement` question specifically (a skill/requirement name, where an honest
+    answer repeating it is a reasonable bar), a positive verdict that mentions the term must
+    have that term actually present in the candidate's own answer. Not extended to
+    `profile_experience`/`profile_skill` refs: a good answer naturally won't repeat a role's
+    "Title — Company" label or a skill's own name verbatim, so the same bar there would punish
+    honest answers, not dishonest feedback."""
     if not isinstance(raw, dict):
         return None
     verdict = raw.get("verdict")
@@ -116,6 +129,14 @@ def verify_feedback_item(raw: Any, *, ref_excerpt: str, answer_text: str) -> tup
     if numbers_in(rationale) - numbers_in(known_text):
         return None
     if novel_terms(rationale, words_in(known_text)):
+        return None
+
+    if (
+        ref_type == "posting_requirement"
+        and verdict in ("addressed", "partially_addressed")
+        and mentions_term(rationale, ref_name)
+        and not mentions_term(answer_text, ref_name)
+    ):
         return None
 
     return str(verdict), rationale

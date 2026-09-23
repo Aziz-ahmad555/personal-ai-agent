@@ -13,6 +13,7 @@ import uuid
 from datetime import UTC, date, datetime, timedelta
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -196,10 +197,25 @@ async def start_match(db: AsyncSession, job: JobPosting) -> JobMatch:
     if match is None:
         match = JobMatch(job_posting_id=job.id, status="running", started_at=now)
         db.add(match)
-    else:
-        match.status = "running"
-        match.error = None
-        match.started_at = now
+        try:
+            await db.flush()
+        except IntegrityError:
+            # Found by a red-team pass: two near-simultaneous requests can both see "no match
+            # yet" and both reach here — the job_posting_id unique constraint lets only one
+            # INSERT through. Recover by taking the normal "reset an existing run" path instead
+            # of surfacing a raw database error to the caller.
+            await db.rollback()
+            match = (
+                await db.execute(select(JobMatch).where(JobMatch.job_posting_id == job.id))
+            ).scalar_one()
+            match.status = "running"
+            match.error = None
+            match.started_at = now
+            await db.flush()
+        return match
+    match.status = "running"
+    match.error = None
+    match.started_at = now
     await db.flush()
     return match
 

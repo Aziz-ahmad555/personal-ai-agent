@@ -9,7 +9,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.audit.models import RISK_LEVELS, AuditLog
@@ -100,27 +100,57 @@ async def decide_approval(
     approved: bool,
     second_check_passed: bool = False,
 ) -> AuditLog:
-    log = (
-        await db.execute(
-            select(AuditLog).where(AuditLog.id == audit_log_id, AuditLog.user_id == user_id)
+    """A single atomic UPDATE...WHERE, not a SELECT-then-write: two concurrent decisions on
+    the same row can no longer both read "pending_approval" and both proceed to write a
+    (possibly conflicting) final state — the database's own row lock during the UPDATE
+    serializes them, so only one can ever match the WHERE clause and actually change the row.
+    The loser affects zero rows and gets a diagnostic-only SELECT afterward (see below) purely
+    to word its error correctly — that SELECT never itself gates the decision."""
+    where_clauses = [
+        AuditLog.id == audit_log_id,
+        AuditLog.user_id == user_id,
+        AuditLog.status == "pending_approval",
+    ]
+    if approved and not second_check_passed:
+        # Without a passing second check, only a non-red row can match — a red row simply
+        # won't be updated, and the diagnostic SELECT below turns that into the right message.
+        where_clauses.append(AuditLog.risk_level != "red")
+
+    # .returning(AuditLog), executed through the ORM session, hands back a properly
+    # session-synced object — unlike a plain Core UPDATE followed by db.get(), which would
+    # silently return a stale, already-loaded copy from the identity map instead of reflecting
+    # what was just written.
+    result = await db.execute(
+        update(AuditLog)
+        .where(*where_clauses)
+        .values(
+            status="approved" if approved else "rejected",
+            decided_at=datetime.now(UTC),
+            decided_by=user_id,
+            second_check_passed=second_check_passed if approved else None,
         )
-    ).scalar_one_or_none()
-    if log is None:
-        raise ApprovalError("No such pending action for this user.")
-    if log.status != "pending_approval":
-        raise ApprovalError(f"Action is already {log.status}, not pending.")
-    if approved and log.risk_level == "red" and not second_check_passed:
+        .returning(AuditLog)
+    )
+    updated = result.scalar_one_or_none()
+    if updated is None:
+        # The write already didn't happen — this is only to word the (still safe, still
+        # non-disclosing for a foreign row) error correctly, never a second gate.
+        log = (
+            await db.execute(
+                select(AuditLog).where(AuditLog.id == audit_log_id, AuditLog.user_id == user_id)
+            )
+        ).scalar_one_or_none()
+        if log is None:
+            raise ApprovalError("No such pending action for this user.")
+        if log.status != "pending_approval":
+            raise ApprovalError(f"Action is already {log.status}, not pending.")
         raise ApprovalError(
             "Red-risk actions require an independent second check to pass before approval "
             "can be honored."
         )
 
-    log.status = "approved" if approved else "rejected"
-    log.decided_at = datetime.now(UTC)
-    log.decided_by = user_id
-    log.second_check_passed = second_check_passed if approved else None
     await db.flush()
-    return log
+    return updated
 
 
 async def record_result(

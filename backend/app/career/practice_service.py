@@ -18,7 +18,10 @@ Unlike JobMatch/TailoredResume/CoverLetter, a job may have many practice session
 meant to be repeated) — app.career.practice_router enforces at most one active at a time.
 """
 
+import asyncio
 import uuid
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -49,6 +52,23 @@ ACTIVE_STATUSES = ("questions_running", "ready_for_answers", "feedback_running")
 
 class PracticeError(RuntimeError):
     """A practice run couldn't finish at all; the message is shown to the user as-is."""
+
+
+# Found by a red-team pass: get_active_session-then-start_session is a SELECT-then-INSERT
+# TOCTOU gap, and unlike JobMatch/TailoredResume/CoverLetter there's no unique DB constraint
+# to fall back on (many sessions per job are allowed by design, so "at most one active" isn't
+# expressible as a column constraint). Closed with a plain in-process lock instead, keyed per
+# job — sufficient for this single-process app; it would need to move to a DB-level advisory
+# lock if this ever ran as more than one worker process. Entries are never evicted, but the
+# memory cost (one asyncio.Lock per job ever practiced) is negligible for a personal app.
+_job_locks: dict[uuid.UUID, asyncio.Lock] = {}
+
+
+@asynccontextmanager
+async def job_lock(job_posting_id: uuid.UUID) -> AsyncIterator[None]:
+    lock = _job_locks.setdefault(job_posting_id, asyncio.Lock())
+    async with lock:
+        yield
 
 
 def _as_utc(value: datetime) -> datetime:
@@ -321,7 +341,11 @@ async def _compute_feedback(
                 continue
             seen.add(question_id)
             result = verify_feedback_item(
-                raw, ref_excerpt=matched.ref_excerpt, answer_text=matched.answer_text or ""
+                raw,
+                ref_type=matched.ref_type,
+                ref_name=matched.ref_name,
+                ref_excerpt=matched.ref_excerpt,
+                answer_text=matched.answer_text or "",
             )
             if result is None:
                 matched.verdict = "unclear"

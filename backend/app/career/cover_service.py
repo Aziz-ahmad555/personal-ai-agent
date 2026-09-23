@@ -12,6 +12,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import delete, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.audit.service import log_action
@@ -72,20 +73,35 @@ async def start_letter(db: AsyncSession, job: JobPosting, user_id: uuid.UUID) ->
             user_id=user_id, job_posting_id=job.id, status="running", started_at=now
         )
         db.add(letter)
-    else:
-        await db.execute(
-            delete(CoverLetterParagraph).where(CoverLetterParagraph.letter_id == letter.id)
-        )
-        letter.status = "running"
-        letter.error = None
-        letter.started_at = now
-        letter.base = None
-        letter.requirements = []
-        letter.gaps = []
-        letter.dropped = []
-        letter.profile_stamp = None
-    await db.flush()
+        try:
+            await db.flush()
+        except IntegrityError:
+            # Found by a red-team pass (same fix as app.career.match_service.start_match): a
+            # concurrent request can win this exact race. Recover by resetting the row that
+            # already exists instead of surfacing a raw database error.
+            await db.rollback()
+            letter = (
+                await db.execute(select(CoverLetter).where(CoverLetter.job_posting_id == job.id))
+            ).scalar_one()
+            await _reset(db, letter, now)
+        return letter
+    await _reset(db, letter, now)
     return letter
+
+
+async def _reset(db: AsyncSession, letter: CoverLetter, now: datetime) -> None:
+    await db.execute(
+        delete(CoverLetterParagraph).where(CoverLetterParagraph.letter_id == letter.id)
+    )
+    letter.status = "running"
+    letter.error = None
+    letter.started_at = now
+    letter.base = None
+    letter.requirements = []
+    letter.gaps = []
+    letter.dropped = []
+    letter.profile_stamp = None
+    await db.flush()
 
 
 async def run_letter(db: AsyncSession, job_posting_id: uuid.UUID, *, user_id: uuid.UUID) -> None:

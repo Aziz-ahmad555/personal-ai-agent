@@ -12,6 +12,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import delete, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -141,18 +142,35 @@ async def start_tailor(db: AsyncSession, job: JobPosting, user_id: uuid.UUID) ->
             user_id=user_id, job_posting_id=job.id, status="running", started_at=now
         )
         db.add(resume)
-    else:
-        await db.execute(delete(ResumeChange).where(ResumeChange.resume_id == resume.id))
-        resume.status = "running"
-        resume.error = None
-        resume.started_at = now
-        resume.base = None
-        resume.requirements = []
-        resume.gaps = []
-        resume.dropped = []
-        resume.profile_stamp = None
-    await db.flush()
+        try:
+            await db.flush()
+        except IntegrityError:
+            # Found by a red-team pass (same fix as app.career.match_service.start_match): a
+            # concurrent request can win this exact race. Recover by resetting the row that
+            # already exists instead of surfacing a raw database error.
+            await db.rollback()
+            resume = (
+                await db.execute(
+                    select(TailoredResume).where(TailoredResume.job_posting_id == job.id)
+                )
+            ).scalar_one()
+            await _reset(db, resume, now)
+        return resume
+    await _reset(db, resume, now)
     return resume
+
+
+async def _reset(db: AsyncSession, resume: TailoredResume, now: datetime) -> None:
+    await db.execute(delete(ResumeChange).where(ResumeChange.resume_id == resume.id))
+    resume.status = "running"
+    resume.error = None
+    resume.started_at = now
+    resume.base = None
+    resume.requirements = []
+    resume.gaps = []
+    resume.dropped = []
+    resume.profile_stamp = None
+    await db.flush()
 
 
 async def run_tailor(db: AsyncSession, job_posting_id: uuid.UUID, *, user_id: uuid.UUID) -> None:

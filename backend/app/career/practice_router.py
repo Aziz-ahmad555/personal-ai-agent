@@ -115,11 +115,6 @@ async def start_practice_session(
             status_code=status.HTTP_409_CONFLICT,
             detail="Score this job's match first — practice reuses its verified requirements.",
         )
-    if await practice_service.get_active_session(db, job.id) is not None:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="A practice session for this job is already in progress.",
-        )
     if body.application_id is not None:
         application = await db.get(Application, body.application_id)
         if (
@@ -132,10 +127,19 @@ async def start_practice_session(
                 detail="That application isn't linked to this job.",
             )
 
-    session = await practice_service.start_session(
-        db, job, user.id, application_id=body.application_id
-    )
-    await db.commit()
+    # The "is there already an active session" check and the session creation must happen as
+    # one unit — see app.career.practice_service.job_lock for why (a real, red-team-found race
+    # otherwise).
+    async with practice_service.job_lock(job.id):
+        if await practice_service.get_active_session(db, job.id) is not None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="A practice session for this job is already in progress.",
+            )
+        session = await practice_service.start_session(
+            db, job, user.id, application_id=body.application_id
+        )
+        await db.commit()
     background_tasks.add_task(_questions_in_background, session.id, user.id)
     return {"status": "questions_started"}
 
