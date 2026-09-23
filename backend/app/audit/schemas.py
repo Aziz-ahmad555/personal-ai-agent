@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
 
 RiskLevel = Literal["green", "yellow", "red"]
 ActionStatus = Literal["pending_approval", "approved", "rejected", "completed", "failed"]
@@ -28,8 +28,8 @@ class AuditLogRead(BaseModel):
 
 
 class ApprovalDecision(BaseModel):
+    """Deliberately has no `second_check_passed` field: whether a red-risk action's
+    independent second check passed is computed server-side by decide_approval itself (see
+    app.audit.second_checks), never asserted by the caller."""
+
     approved: bool
-    second_check_passed: bool = Field(
-        default=False,
-        description="Must be true for a red-risk action's approval to be honored.",
-    )

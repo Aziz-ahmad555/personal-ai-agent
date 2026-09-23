@@ -13,6 +13,7 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.audit.models import RISK_LEVELS, AuditLog
+from app.audit.second_checks import SECOND_CHECKS
 
 
 class ApprovalError(RuntimeError):
@@ -98,23 +99,45 @@ async def decide_approval(
     audit_log_id: uuid.UUID,
     user_id: uuid.UUID,
     approved: bool,
-    second_check_passed: bool = False,
 ) -> AuditLog:
-    """A single atomic UPDATE...WHERE, not a SELECT-then-write: two concurrent decisions on
-    the same row can no longer both read "pending_approval" and both proceed to write a
-    (possibly conflicting) final state — the database's own row lock during the UPDATE
-    serializes them, so only one can ever match the WHERE clause and actually change the row.
-    The loser affects zero rows and gets a diagnostic-only SELECT afterward (see below) purely
-    to word its error correctly — that SELECT never itself gates the decision."""
-    where_clauses = [
-        AuditLog.id == audit_log_id,
-        AuditLog.user_id == user_id,
-        AuditLog.status == "pending_approval",
-    ]
-    if approved and not second_check_passed:
-        # Without a passing second check, only a non-red row can match — a red row simply
-        # won't be updated, and the diagnostic SELECT below turns that into the right message.
-        where_clauses.append(AuditLog.risk_level != "red")
+    """The actual decision is a single atomic UPDATE...WHERE, not a SELECT-then-write: two
+    concurrent decisions on the same row can no longer both read "pending_approval" and both
+    proceed to write a (possibly conflicting) final state — the database's own row lock during
+    the UPDATE serializes them, so only one can ever match the WHERE clause and actually change
+    the row. The loser affects zero rows and gets a diagnostic-only SELECT afterward (see below)
+    purely to word its error correctly — that SELECT never itself gates the decision.
+
+    Approving a red-risk row is the one exception that needs a read first: whether it's honored
+    depends on an independent second check (see app.audit.second_checks) keyed by the row's own
+    `action`, which this function runs itself — never something the API caller can assert (that
+    was the whole gap: previously `second_check_passed` was just a client-supplied boolean).
+    That read never decides anything by itself — it can't, since the actual state transition is
+    still gated by the atomic UPDATE below, so two concurrent approvals of the same row still
+    can't both succeed."""
+    second_check_passed: bool | None = None
+
+    if approved:
+        pending = (
+            await db.execute(
+                select(AuditLog).where(
+                    AuditLog.id == audit_log_id,
+                    AuditLog.user_id == user_id,
+                    AuditLog.status == "pending_approval",
+                )
+            )
+        ).scalar_one_or_none()
+        if pending is not None and pending.risk_level == "red":
+            check = SECOND_CHECKS.get(pending.action)
+            if check is None:
+                raise ApprovalError(
+                    "No independent second check is registered for this action; a red-risk "
+                    "action cannot be approved without one."
+                )
+            if not await check(db, pending):
+                raise ApprovalError(
+                    "The independent second check did not pass; approval was not honored."
+                )
+            second_check_passed = True
 
     # .returning(AuditLog), executed through the ORM session, hands back a properly
     # session-synced object — unlike a plain Core UPDATE followed by db.get(), which would
@@ -122,12 +145,16 @@ async def decide_approval(
     # what was just written.
     result = await db.execute(
         update(AuditLog)
-        .where(*where_clauses)
+        .where(
+            AuditLog.id == audit_log_id,
+            AuditLog.user_id == user_id,
+            AuditLog.status == "pending_approval",
+        )
         .values(
             status="approved" if approved else "rejected",
             decided_at=datetime.now(UTC),
             decided_by=user_id,
-            second_check_passed=second_check_passed if approved else None,
+            second_check_passed=second_check_passed,
         )
         .returning(AuditLog)
     )
@@ -142,12 +169,7 @@ async def decide_approval(
         ).scalar_one_or_none()
         if log is None:
             raise ApprovalError("No such pending action for this user.")
-        if log.status != "pending_approval":
-            raise ApprovalError(f"Action is already {log.status}, not pending.")
-        raise ApprovalError(
-            "Red-risk actions require an independent second check to pass before approval "
-            "can be honored."
-        )
+        raise ApprovalError(f"Action is already {log.status}, not pending.")
 
     await db.flush()
     return updated

@@ -47,9 +47,11 @@ class AuditLog(Base):
     resource_type: Mapped[str | None] = mapped_column(String(50))
     resource_id: Mapped[uuid.UUID | None] = mapped_column(Uuid)
 
-    # Red-risk actions require this to be explicitly True — set by a check that is not the
-    # same code path that proposed the action — before decide_approval will honor
-    # approved=True. Still null for green/yellow rows and for red rows not yet decided.
+    # Red-risk actions require this to be True before decide_approval will honor approved=True
+    # — set internally by decide_approval itself, after running the independent check
+    # registered for this row's `action` in app.audit.second_checks (never supplied by the API
+    # caller; that was a self-forgeable gap closed in Phase 10). Still null for green/yellow
+    # rows and for red rows not yet decided.
     second_check_passed: Mapped[bool | None] = mapped_column(Boolean)
 
     result: Mapped[dict[str, Any] | None] = mapped_column(JSON)

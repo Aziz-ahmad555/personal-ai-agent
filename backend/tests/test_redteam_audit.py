@@ -7,14 +7,20 @@ deterministically in a test, so what's tested here is the observable contract th
 guarantees: a row can never be decided twice (see test_deciding_an_already_decided_action_raises
 in test_audit_service.py, which already covers this and still passes against the new code).
 
-What's new here is a real, still-open finding this pass surfaced: `second_check_passed` is a
-plain field in the same request the same caller sends — nothing independently verifies it."""
+This pass also found — and, per an explicit user design decision, has now closed — a second
+finding: `second_check_passed` used to be a plain boolean in the same decide request the same
+caller sends, with nothing independently verifying it. It's fixed by removing the field from
+the client-facing API entirely (app.audit.schemas.ApprovalDecision has no such field) and having
+decide_approval itself run a registered, independent check (app.audit.second_checks) at decision
+time. See tests/test_audit_service.py for the mechanism's unit coverage; this test proves the
+attack itself — a caller trying to assert the claim directly — no longer has any effect."""
 
 import uuid
 
+import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.audit.service import decide_approval, request_approval
+from app.audit.service import ApprovalError, decide_approval, request_approval
 from app.db.models import User
 
 
@@ -25,20 +31,13 @@ async def _make_user(db: AsyncSession) -> User:
     return user
 
 
-async def test_FINDING_second_check_passed_is_self_forgeable(
+async def test_a_caller_can_no_longer_assert_its_own_second_check_passed(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
-    """Documented gap, not fixed here (flagged to the user as a design-decision item: what a
-    genuine independent second check should even consist of is a real design question, not a
-    bug with an obvious fix). The docstring on AuditLog.second_check_passed says it should be
-    "set by a check that is not the same code path that proposed the action" — but the same
-    caller who requested a red-risk action can simply supply
-    {"approved": true, "second_check_passed": true} in the exact same decide request, and
-    decide_approval has no independent mechanism to verify that claim. Currently latent: no
-    `request_approval` call site in the app uses risk_level="red" yet (both real callers, in
-    app.github.proposals, use "yellow"), so nothing exploits this today — but the audit API
-    itself would honor it the moment a red-risk feature ships without a real second-check
-    mechanism behind it."""
+    """decide_approval no longer accepts a `second_check_passed` argument at all — the
+    self-forgery attack this test is named for isn't rejected at runtime, it's structurally
+    impossible to express: there's no parameter left to forge. What decides a red row's
+    approval now is exclusively the registry in app.audit.second_checks, run server-side."""
     async with session_factory() as db:
         user = await _make_user(db)
         pending = await request_approval(
@@ -50,19 +49,16 @@ async def test_FINDING_second_check_passed_is_self_forgeable(
         )
         await db.commit()
 
-        # The same user, in one call, supplies both the approval and the "second check" —
-        # nothing else in the system independently computed second_check_passed.
-        approved = await decide_approval(
-            db,
-            audit_log_id=pending.id,
-            user_id=user.id,
-            approved=True,
-            second_check_passed=True,
-        )
-        await db.commit()
+        with pytest.raises(TypeError):
+            await decide_approval(  # type: ignore[call-arg]
+                db,
+                audit_log_id=pending.id,
+                user_id=user.id,
+                approved=True,
+                second_check_passed=True,
+            )
 
-    # Today's actual behavior: this succeeds. Recorded here as a known, reported gap — not
-    # asserted as correct. If a real second-check mechanism is added, this test should be
-    # rewritten to prove a *self-supplied* claim is rejected, not just that the flag exists.
-    assert approved.status == "approved"
-    assert approved.second_check_passed is True
+        # And with the forged kwarg gone, the honest call path still refuses to approve —
+        # this action has no independent check registered, so it's fail-closed, not open.
+        with pytest.raises(ApprovalError, match="No independent second check"):
+            await decide_approval(db, audit_log_id=pending.id, user_id=user.id, approved=True)

@@ -62,7 +62,6 @@ async def decide(
             audit_log_id=log_id,
             user_id=user.id,
             approved=body.approved,
-            second_check_passed=body.second_check_passed,
         )
     except ApprovalError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc

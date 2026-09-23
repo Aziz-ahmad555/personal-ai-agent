@@ -110,9 +110,12 @@ async def test_deciding_an_already_decided_action_raises(
             await decide_approval(db, audit_log_id=pending.id, user_id=user.id, approved=True)
 
 
-async def test_red_action_requires_second_check_to_approve(
+async def test_red_action_with_no_registered_second_check_cannot_be_approved(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
+    """Fail-closed: a red-risk action whose `action` has no entry in
+    app.audit.second_checks.SECOND_CHECKS can never be approved, not even once — this makes
+    shipping a red action without a real independent check loud instead of silently unsafe."""
     async with session_factory() as db:
         user = await _make_user(db)
         pending = await request_approval(
@@ -124,24 +127,70 @@ async def test_red_action_requires_second_check_to_approve(
         )
         await db.commit()
 
-        with pytest.raises(ApprovalError):
-            await decide_approval(
-                db,
-                audit_log_id=pending.id,
-                user_id=user.id,
-                approved=True,
-                second_check_passed=False,
-            )
+        with pytest.raises(ApprovalError, match="No independent second check"):
+            await decide_approval(db, audit_log_id=pending.id, user_id=user.id, approved=True)
+
+
+async def test_red_action_approval_runs_the_registered_second_check(
+    session_factory: async_sessionmaker[AsyncSession],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The second check is computed by decide_approval itself from the registry, using the
+    audit log row it re-reads — never something the caller passes in."""
+    from app.audit import second_checks
+
+    action = "career.application.submit"
+    calls: list[uuid.UUID] = []
+
+    async def _fake_check(db: AsyncSession, log: AuditLog) -> bool:
+        calls.append(log.id)
+        return True
+
+    monkeypatch.setitem(second_checks.SECOND_CHECKS, action, _fake_check)
+
+    async with session_factory() as db:
+        user = await _make_user(db)
+        pending = await request_approval(
+            db, user_id=user.id, action=action, risk_level="red", summary="Submit an application."
+        )
+        await db.commit()
 
         approved = await decide_approval(
-            db,
-            audit_log_id=pending.id,
-            user_id=user.id,
-            approved=True,
-            second_check_passed=True,
+            db, audit_log_id=pending.id, user_id=user.id, approved=True
         )
         assert approved.status == "approved"
         assert approved.second_check_passed is True
+        assert calls == [pending.id]
+
+
+async def test_red_action_approval_is_refused_when_the_second_check_fails(
+    session_factory: async_sessionmaker[AsyncSession],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.audit import second_checks
+
+    action = "career.application.submit"
+
+    async def _failing_check(db: AsyncSession, log: AuditLog) -> bool:
+        return False
+
+    monkeypatch.setitem(second_checks.SECOND_CHECKS, action, _failing_check)
+
+    async with session_factory() as db:
+        user = await _make_user(db)
+        pending = await request_approval(
+            db, user_id=user.id, action=action, risk_level="red", summary="Submit an application."
+        )
+        await db.commit()
+
+        with pytest.raises(ApprovalError, match="did not pass"):
+            await decide_approval(db, audit_log_id=pending.id, user_id=user.id, approved=True)
+
+        # Left exactly as it was — a failed second check doesn't burn the pending row, so a
+        # legitimate approval can still be retried once whatever the check flagged is resolved.
+        still_pending = await db.get(AuditLog, pending.id)
+        assert still_pending is not None
+        assert still_pending.status == "pending_approval"
 
 
 async def test_a_red_action_can_still_be_rejected_without_a_second_check(
