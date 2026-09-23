@@ -1,6 +1,7 @@
 import time
 import uuid
-from collections.abc import Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -21,6 +22,7 @@ from app.career.router import router as career_router
 from app.config import get_settings
 from app.core.health import router as health_router
 from app.core.rate_limit import limiter
+from app.core.scheduler import build_scheduler
 from app.github.readiness_router import router as github_readiness_router
 from app.github.router import router as github_router
 from app.github.sync_router import router as github_sync_router
@@ -36,9 +38,30 @@ configure_logging()
 logger = get_logger(__name__)
 
 
+@asynccontextmanager
+async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
+    settings = get_settings()
+    scheduler = None
+    if settings.background_scheduler_enabled:
+        scheduler = build_scheduler(settings)
+        scheduler.start()
+        logger.info(
+            "background_scheduler_started",
+            github_sync_interval_hours=settings.github_sync_interval_hours,
+            job_feed_poll_interval_hours=settings.job_feed_poll_interval_hours,
+            digest_generation_interval_days=settings.digest_generation_interval_days,
+        )
+    app.state.scheduler = scheduler
+    try:
+        yield
+    finally:
+        if scheduler is not None:
+            scheduler.shutdown(wait=False)
+
+
 def create_app() -> FastAPI:
     settings = get_settings()
-    app = FastAPI(title="Personal AI Agent API", version="0.1.0")
+    app = FastAPI(title="Personal AI Agent API", version="0.1.0", lifespan=_lifespan)
 
     app.state.limiter = limiter
     # slowapi's handler predates Starlette's generic Request/Response typing.

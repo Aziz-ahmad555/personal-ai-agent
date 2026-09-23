@@ -123,7 +123,7 @@ async def start_run(db: AsyncSession, connection_id: uuid.UUID) -> GithubSyncRun
     return run
 
 
-async def run_sync(db: AsyncSession, run_id: uuid.UUID) -> None:
+async def run_sync(db: AsyncSession, run_id: uuid.UUID, *, trigger: str = "manual") -> None:
     run = await db.get(GithubSyncRun, run_id)
     if run is None:
         logger.warning("github_sync_run_not_found", run_id=str(run_id))
@@ -133,7 +133,7 @@ async def run_sync(db: AsyncSession, run_id: uuid.UUID) -> None:
     connection_id = run.connection_id
     connection = await db.get(GithubConnection, connection_id)
     if connection is None:
-        await _fail(db, run_id, "The GitHub connection no longer exists.")
+        await _fail(db, run_id, "The GitHub connection no longer exists.", trigger=trigger)
         return
 
     run.status = "running"
@@ -143,14 +143,14 @@ async def run_sync(db: AsyncSession, run_id: uuid.UUID) -> None:
     try:
         token = await get_valid_access_token(db, connection)
     except Exception as exc:  # noqa: BLE001 — every failure is reported on the run
-        await _fail(db, run_id, _describe(exc))
+        await _fail(db, run_id, _describe(exc), trigger=trigger)
         return
 
     http: gh.GithubHttp | None = None
     try:
         async with httpx.AsyncClient(timeout=20.0) as client:
             http = gh.GithubHttp(client, token, budget=MAX_REQUESTS)
-            await _sync(db, run, connection, http)
+            await _sync(db, run, connection, http, trigger=trigger)
     except gh.GithubAuthError:
         await _fail(
             db,
@@ -158,10 +158,11 @@ async def run_sync(db: AsyncSession, run_id: uuid.UUID) -> None:
             "GitHub rejected the access token — reconnect GitHub.",
             http,
             needs_reauth=True,
+            trigger=trigger,
         )
     except Exception as exc:  # noqa: BLE001 — a background task must record, not raise
         logger.warning("github_sync_failed", error=str(exc))
-        await _fail(db, run_id, _describe(exc), http)
+        await _fail(db, run_id, _describe(exc), http, trigger=trigger)
 
 
 def _describe(exc: Exception) -> str:
@@ -177,6 +178,7 @@ async def _fail(
     http: gh.GithubHttp | None = None,
     *,
     needs_reauth: bool = False,
+    trigger: str = "manual",
 ) -> None:
     await db.rollback()  # drop any half-finished work, then record the failure cleanly
     run = await db.get(GithubSyncRun, run_id)
@@ -199,6 +201,7 @@ async def _fail(
             risk_level="green",
             summary="GitHub sync did not complete.",
             error=message,
+            evidence={"trigger": trigger},
             resource_type="github_sync_run",
             resource_id=run.id,
         )
@@ -206,7 +209,12 @@ async def _fail(
 
 
 async def _sync(
-    db: AsyncSession, run: GithubSyncRun, connection: GithubConnection, http: gh.GithubHttp
+    db: AsyncSession,
+    run: GithubSyncRun,
+    connection: GithubConnection,
+    http: gh.GithubHttp,
+    *,
+    trigger: str = "manual",
 ) -> None:
     warnings: list[str] = []
 
@@ -279,6 +287,7 @@ async def _sync(
             "requests_made": http.requests_made,
             "proposals": len(derivation.proposals),
             "warnings": warnings,
+            "trigger": trigger,
         },
         resource_type="github_sync_run",
         resource_id=run.id,

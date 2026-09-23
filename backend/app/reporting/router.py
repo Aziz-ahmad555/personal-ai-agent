@@ -1,6 +1,5 @@
 import re
 import uuid
-from datetime import date
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
@@ -14,7 +13,7 @@ from app.db.models import User
 from app.reporting.models import WeeklyDigest
 from app.reporting.pdf import render_digest_pdf
 from app.reporting.schemas import GenerateDigestRequest, WeeklyDigestRead, WeeklyDigestSummary
-from app.reporting.service import build_digest
+from app.reporting.service import create_digest
 
 router = APIRouter(prefix="/reporting", tags=["reporting"])
 
@@ -40,24 +39,8 @@ async def generate_digest(
     user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> WeeklyDigest:
-    data = await build_digest(db, user.id, days=body.days, lookahead_days=body.lookahead_days)
-    period = data["period"]
-    digest = WeeklyDigest(
-        user_id=user.id,
-        period_start=date.fromisoformat(period["start"]),
-        period_end=date.fromisoformat(period["end"]),
-        data=data,
-    )
-    db.add(digest)
-    await db.flush()
-    await log_action(
-        db,
-        user_id=user.id,
-        action="reporting.digest.generated",
-        risk_level="green",
-        summary=f"Generated a weekly digest covering {period['start']} to {period['end']}.",
-        resource_type="weekly_digest",
-        resource_id=digest.id,
+    digest = await create_digest(
+        db, user.id, days=body.days, lookahead_days=body.lookahead_days, trigger="manual"
     )
     await db.commit()
     return digest

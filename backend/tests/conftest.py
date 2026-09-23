@@ -14,6 +14,11 @@ os.environ.setdefault("GITHUB_CLIENT_SECRET", "test-github-client-secret")
 # separate env var from REDIS_URL: app.core.health's real redis-py client doesn't understand
 # the `memory://` pseudo-scheme and would raise before its own try/except could catch it.
 os.environ.setdefault("RATE_LIMIT_STORAGE_URI", "memory://")
+# The background scheduler (app.core.scheduler) only starts via app.main's lifespan handler,
+# which httpx's ASGITransport never triggers unless a test explicitly wires up lifespan
+# support — so this is belt-and-suspenders, not load-bearing, but keeps a real interval
+# scheduler from ever running against the test database if that ever changes.
+os.environ.setdefault("BACKGROUND_SCHEDULER_ENABLED", "false")
 
 import pytest  # noqa: E402
 from httpx import ASGITransport, AsyncClient  # noqa: E402

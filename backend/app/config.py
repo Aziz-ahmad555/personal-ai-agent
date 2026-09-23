@@ -94,6 +94,17 @@ class Settings(BaseSettings):
     usajobs_api_key: str | None = None
     usajobs_user_agent_email: str | None = None
 
+    # Phase 11, Group A: three already-Green, read-only-or-pure-aggregation actions promoted
+    # from "human clicks a button" to "runs on a schedule" (app.core.scheduler). Each interval
+    # is independently tunable; the master flag reverts to fully-manual behavior instantly with
+    # no data-model change. Deliberately excludes Gmail/Calendar (their OAuth tokens have real
+    # reauth fragility — a separate, later decision) and anything that could write outside the
+    # user's own local data (no such action exists yet regardless).
+    background_scheduler_enabled: bool = True
+    github_sync_interval_hours: int = 24
+    job_feed_poll_interval_hours: int = 6
+    digest_generation_interval_days: int = 7
+
     @property
     def effective_rate_limit_storage_uri(self) -> str:
         return self.rate_limit_storage_uri or self.redis_url

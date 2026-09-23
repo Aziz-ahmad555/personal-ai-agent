@@ -223,7 +223,11 @@ async def capture_job_from_text(
 
 
 async def poll_company_feed(
-    db: AsyncSession, feed: JobBoardFeed, *, settings: Settings | None = None
+    db: AsyncSession,
+    feed: JobBoardFeed,
+    *,
+    settings: Settings | None = None,
+    trigger: str = "manual",
 ) -> list[JobPosting]:
     settings = settings or get_settings()
 
@@ -266,7 +270,7 @@ async def poll_company_feed(
             action="career.feed.poll_failed",
             risk_level="green",
             summary=f"Polling the {feed.board} feed failed.",
-            evidence={"feed_id": str(feed.id)},
+            evidence={"feed_id": str(feed.id), "trigger": trigger},
             resource_type="job_board_feed",
             resource_id=feed.id,
             error=str(exc),
@@ -331,7 +335,12 @@ async def poll_company_feed(
             f"Polled the {feed.board} feed "
             f"({feed.company_slug or feed.keyword}): {len(created)} new posting(s)."
         ),
-        evidence={"feed_id": str(feed.id), "found": len(raw_postings), "new": len(created)},
+        evidence={
+            "feed_id": str(feed.id),
+            "found": len(raw_postings),
+            "new": len(created),
+            "trigger": trigger,
+        },
         resource_type="job_board_feed",
         resource_id=feed.id,
         result={"new_job_posting_ids": [str(p.id) for p in created]},

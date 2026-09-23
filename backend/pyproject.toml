@@ -28,6 +28,7 @@ dependencies = [
     "cryptography>=43.0,<46.0",
     "reportlab>=4.2,<5.0",
     "slowapi>=0.1.9,<1.0",
+    "apscheduler>=3.10,<4.0",
 ]
 
 [project.optional-dependencies]
@@ -69,5 +70,5 @@ plugins = ["pydantic.mypy"]
 exclude = ["alembic/"]
 
 [[tool.mypy.overrides]]
-module = ["tavily.*", "google.*", "trafilatura.*", "reportlab.*"]
+module = ["tavily.*", "google.*", "trafilatura.*", "reportlab.*", "apscheduler.*"]
 ignore_missing_imports = true

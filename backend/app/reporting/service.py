@@ -6,13 +6,14 @@ frozen into a WeeklyDigest row; nothing here re-runs once stored.
 """
 
 import uuid
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.audit.models import AuditLog
+from app.audit.service import log_action
 from app.calendar import sync as calendar_sync
 from app.calendar.models import CalendarConnection, CalendarEvent, CalendarSyncRun
 from app.career import cover_service, match_service, practice_service, resume_service
@@ -34,6 +35,7 @@ from app.github import sync as github_sync
 from app.github.models import GithubConnection, GithubRepo, GithubSkillProposal, GithubSyncRun
 from app.gmail import sync as gmail_sync
 from app.gmail.models import EmailMessage, GmailConnection, GmailSyncRun
+from app.reporting.models import WeeklyDigest
 from app.research.models import ResearchClaim, ResearchQuery
 
 # Item lists are capped so a long history doesn't produce an unbounded JSON blob; the `count`
@@ -108,6 +110,41 @@ async def build_digest(
             github_connection=github_connection,
         ),
     }
+
+
+async def create_digest(
+    db: AsyncSession,
+    user_id: uuid.UUID,
+    *,
+    days: int = DEFAULT_DAYS,
+    lookahead_days: int = DEFAULT_LOOKAHEAD_DAYS,
+    trigger: str = "manual",
+) -> WeeklyDigest:
+    """Builds a digest and stores it as a row, audit-logged — the one path both the manual
+    /reporting/digests endpoint and the scheduled weekly job go through, so a scheduled digest
+    is indistinguishable from a manually-requested one except for the `trigger` tag in its
+    audit evidence."""
+    data = await build_digest(db, user_id, days=days, lookahead_days=lookahead_days)
+    period = data["period"]
+    digest = WeeklyDigest(
+        user_id=user_id,
+        period_start=date.fromisoformat(period["start"]),
+        period_end=date.fromisoformat(period["end"]),
+        data=data,
+    )
+    db.add(digest)
+    await db.flush()
+    await log_action(
+        db,
+        user_id=user_id,
+        action="reporting.digest.generated",
+        risk_level="green",
+        summary=f"Generated a weekly digest covering {period['start']} to {period['end']}.",
+        evidence={"trigger": trigger},
+        resource_type="weekly_digest",
+        resource_id=digest.id,
+    )
+    return digest
 
 
 async def _career_section(
