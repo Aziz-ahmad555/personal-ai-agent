@@ -17,6 +17,9 @@ If a red-risk action has no registered check, decide_approval refuses to approve
 (fail-closed, see ApprovalError in app.audit.service) — deliberately, so that shipping a red
 action without wiring a real check is loud (every approval attempt fails) rather than silent
 (approval just works, unverified).
+
+See app.auth.account_deletion._verify_evidence_still_matches (registered for
+"account.delete_all_data") for a real one, rather than the illustrative sketch above.
 """
 
 from collections.abc import Awaitable, Callable

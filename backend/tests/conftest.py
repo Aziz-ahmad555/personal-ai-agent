@@ -22,6 +22,7 @@ os.environ.setdefault("BACKGROUND_SCHEDULER_ENABLED", "false")
 
 import pytest  # noqa: E402
 from httpx import ASGITransport, AsyncClient  # noqa: E402
+from sqlalchemy import event  # noqa: E402
 from sqlalchemy.ext.asyncio import (  # noqa: E402
     AsyncSession,
     async_sessionmaker,
@@ -40,6 +41,16 @@ test_engine = create_async_engine(
     poolclass=StaticPool,
 )
 TestSessionFactory = async_sessionmaker(test_engine, expire_on_commit=False)
+
+
+@event.listens_for(test_engine.sync_engine, "connect")
+def _enable_sqlite_foreign_keys(dbapi_connection: object, _: object) -> None:
+    """SQLite ignores every `ondelete=CASCADE`/`ondelete=SET NULL` in the schema unless a
+    connection turns this on explicitly — off by default, unlike Postgres (which the real
+    app runs on and always enforces these). Without it, a test deleting a parent row would
+    silently leave every child row behind, one connection pragma away from actually proving
+    the cascade real Postgres already performs."""
+    dbapi_connection.execute("PRAGMA foreign_keys=ON")
 
 
 async def _override_get_db() -> AsyncGenerator[AsyncSession, None]:

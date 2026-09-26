@@ -1,10 +1,21 @@
 import types
 import uuid
+from collections.abc import Callable
 
+import httpx
 import jwt
 import pytest
 
 from app.gmail import oauth
+
+REAL_CLIENT = httpx.AsyncClient
+
+
+def _mock_http(monkeypatch: pytest.MonkeyPatch, handler: Callable[[httpx.Request], httpx.Response]):
+    transport = httpx.MockTransport(handler)
+    monkeypatch.setattr(
+        oauth.httpx, "AsyncClient", lambda **kwargs: REAL_CLIENT(transport=transport)
+    )
 
 
 def test_build_authorization_url_includes_required_params() -> None:
@@ -36,6 +47,39 @@ def test_verify_state_round_trips_the_user_id() -> None:
 def test_verify_state_rejects_garbage() -> None:
     with pytest.raises(oauth.OAuthError):
         oauth.verify_state("not-a-real-token")
+
+
+# --- revoke -----------------------------------------------------------------------------
+
+
+async def test_revoke_reports_success(monkeypatch: pytest.MonkeyPatch) -> None:
+    seen: dict[str, object] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["url"] = str(request.url)
+        return httpx.Response(200)
+
+    _mock_http(monkeypatch, handler)
+
+    assert await oauth.revoke_token("ya29.access") is True
+    assert "token=ya29.access" in seen["url"]
+
+
+async def test_revoke_never_raises_when_google_is_unreachable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("down")
+
+    _mock_http(monkeypatch, handler)
+
+    assert await oauth.revoke_token("ya29.access") is False
+
+
+async def test_revoke_reports_failure_on_a_non_200(monkeypatch: pytest.MonkeyPatch) -> None:
+    _mock_http(monkeypatch, lambda request: httpx.Response(400))
+
+    assert await oauth.revoke_token("already-revoked") is False
 
 
 def test_verify_state_rejects_a_token_of_the_wrong_type() -> None:

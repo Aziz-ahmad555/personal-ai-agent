@@ -26,6 +26,7 @@ logger = get_logger(__name__)
 
 GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
+GOOGLE_REVOKE_URL = "https://oauth2.googleapis.com/revoke"
 GMAIL_READONLY_SCOPE = "https://www.googleapis.com/auth/gmail.readonly"
 
 
@@ -155,3 +156,18 @@ async def refresh_access_token(refresh_token: str) -> TokenResponse:
         expires_at=datetime.now(UTC) + timedelta(seconds=data["expires_in"]),
         granted_scopes=data.get("scope", ""),
     )
+
+
+async def revoke_token(token: str) -> bool:
+    """Best-effort: tells Google to invalidate this token so it can't be used again, even
+    though it's about to be deleted from our own database either way. Returns whether Google
+    confirmed it (never raises — an unreachable Google must not block disconnecting). Mirrors
+    app.calendar.oauth.revoke_token — Google's revoke endpoint is generic across products, so
+    the same call works for a Gmail token."""
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            response = await client.post(GOOGLE_REVOKE_URL, params={"token": token})
+        return response.status_code == 200
+    except httpx.HTTPError as exc:
+        logger.warning("gmail_oauth_revoke_failed", error=str(exc))
+        return False

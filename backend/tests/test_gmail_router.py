@@ -7,10 +7,23 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.db.models import User
+from app.gmail import oauth
 from app.gmail import router as router_module
 from app.gmail.crypto import encrypt_token
 from app.gmail.models import EmailMessage, GmailConnection
 from app.gmail.oauth import TokenResponse, build_authorization_url
+
+
+def _fake_revoke(monkeypatch: pytest.MonkeyPatch) -> list[str]:
+    """Stub the network. Returns the list that records which tokens got revoked."""
+    revoked: list[str] = []
+
+    async def revoke(token: str) -> bool:
+        revoked.append(token)
+        return True
+
+    monkeypatch.setattr(oauth, "revoke_token", revoke)
+    return revoked
 
 
 async def _get_user_id(session_factory: async_sessionmaker[AsyncSession]) -> uuid.UUID:
@@ -170,7 +183,9 @@ async def test_disconnect_purges_data_when_requested(
     client: AsyncClient,
     auth_headers: dict[str, str],
     session_factory: async_sessionmaker[AsyncSession],
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    revoked = _fake_revoke(monkeypatch)
     user_id = await _get_user_id(session_factory)
     connection = await _insert_connection(session_factory, user_id)
     async with session_factory() as db:
@@ -191,6 +206,7 @@ async def test_disconnect_purges_data_when_requested(
     )
     assert response.status_code == 200
     assert response.json()["status"] == "disconnected"
+    assert revoked == ["refresh"]  # the refresh token is revoked over the access token
 
     async with session_factory() as db:
         rows = await db.execute(
@@ -204,7 +220,9 @@ async def test_disconnect_keeps_data_when_not_requested(
     client: AsyncClient,
     auth_headers: dict[str, str],
     session_factory: async_sessionmaker[AsyncSession],
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    _fake_revoke(monkeypatch)
     user_id = await _get_user_id(session_factory)
     connection = await _insert_connection(session_factory, user_id)
     async with session_factory() as db:

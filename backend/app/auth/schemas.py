@@ -28,3 +28,13 @@ class TokenPair(BaseModel):
 
 class RefreshRequest(BaseModel):
     refresh_token: str
+
+
+class AccountDeletionResult(BaseModel):
+    """The result of deciding a pending account.delete_all_data approval. A decline leaves
+    everything untouched (deleted=False, nothing else set). An approval executes the
+    deletion in the same call — see app.auth.account_deletion."""
+
+    deleted: bool
+    row_counts: dict[str, int] | None = None
+    revoked_at_provider: dict[str, bool] | None = None

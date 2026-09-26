@@ -1,3 +1,4 @@
+import uuid
 from typing import Annotated
 
 import jwt
@@ -6,8 +7,20 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.audit.schemas import ApprovalDecision, AuditLogRead
+from app.audit.service import ApprovalError
+from app.auth.account_deletion import (
+    decide_and_execute_account_deletion,
+    request_account_deletion,
+)
 from app.auth.deps import any_users_exist, get_current_user
-from app.auth.schemas import RefreshRequest, TokenPair, UserRead, UserRegister
+from app.auth.schemas import (
+    AccountDeletionResult,
+    RefreshRequest,
+    TokenPair,
+    UserRead,
+    UserRegister,
+)
 from app.auth.security import create_token, decode_token, hash_password, verify_password
 from app.core.rate_limit import limiter
 from app.db.base import get_db
@@ -115,3 +128,43 @@ async def refresh(
 @router.get("/me", response_model=UserRead)
 async def me(current_user: Annotated[User, Depends(get_current_user)]) -> User:
     return current_user
+
+
+@router.post(
+    "/delete-account/request", response_model=AuditLogRead, status_code=status.HTTP_201_CREATED
+)
+async def request_delete_account(
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> AuditLogRead:
+    """Files a red-risk request to permanently delete every record this account owns and
+    revoke every connected integration at its provider — a genuine full-account wipe, not a
+    per-integration disconnect. Returns the pending approval with a live evidence snapshot
+    (row counts, connection statuses) for the frontend to show as the confirmation screen.
+    Nothing is deleted until /delete-account/{id}/decide is called with approved=true."""
+    log = await request_account_deletion(db, user=current_user)
+    await db.commit()
+    await db.refresh(log)
+    return AuditLogRead.model_validate(log)
+
+
+@router.post("/delete-account/{log_id}/decide", response_model=AccountDeletionResult)
+async def decide_delete_account(
+    log_id: uuid.UUID,
+    body: ApprovalDecision,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> AccountDeletionResult:
+    """The user's second, explicit confirmation. Declining leaves the account untouched.
+    Approving re-verifies the evidence from /delete-account/request against the database
+    right now (the independent second check every red-risk action requires) and refuses if
+    it has drifted — then, only if that passes, actually deletes the account in this same
+    call. There is no further step after a successful approval: the account (and the access
+    token this request is authenticated with) no longer exists."""
+    try:
+        result = await decide_and_execute_account_deletion(
+            db, audit_log_id=log_id, user=current_user, approved=body.approved
+        )
+    except ApprovalError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    return AccountDeletionResult.model_validate(result)

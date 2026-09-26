@@ -13,8 +13,9 @@ from app.config import get_settings
 from app.db import base as db_base
 from app.db.base import get_db
 from app.db.models import User
+from app.gmail import oauth
 from app.gmail.client import GmailApiError, get_profile
-from app.gmail.crypto import encrypt_token
+from app.gmail.crypto import decrypt_token, encrypt_token
 from app.gmail.models import EmailMessage, GmailConnection, GmailSyncRun
 from app.gmail.oauth import (
     OAuthError,
@@ -201,6 +202,17 @@ async def disconnect(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> GmailConnection:
     connection = await _get_connection(db, current_user.id)
+
+    # Previously this only cleared the tokens locally and never told Google to invalidate
+    # the grant — the same revoke Calendar/GitHub's own disconnect already does. Revoking the
+    # refresh token (preferred when present) invalidates the whole grant, not just one
+    # access token.
+    token_to_revoke = connection.refresh_token_encrypted or connection.access_token_encrypted
+    if token_to_revoke:
+        try:
+            await oauth.revoke_token(decrypt_token(token_to_revoke))
+        except Exception:  # noqa: BLE001 — an undecryptable token must not block disconnecting
+            pass
 
     connection.status = "disconnected"
     connection.access_token_encrypted = None
