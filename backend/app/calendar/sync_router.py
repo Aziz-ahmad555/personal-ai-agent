@@ -1,6 +1,7 @@
 import uuid
 from typing import Annotated
 
+import structlog
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -45,6 +46,7 @@ def _run_read(run: CalendarSyncRun) -> SyncRunRead:
 
 
 async def _run_in_background(run_id: uuid.UUID) -> None:
+    structlog.contextvars.bind_contextvars(task_id=str(run_id))
     async with db_base.async_session_factory() as db:
         await sync_service.run_sync(db, run_id)
 

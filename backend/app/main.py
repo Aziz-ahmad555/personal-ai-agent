@@ -3,6 +3,7 @@ import uuid
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 
+import structlog
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
@@ -80,13 +81,20 @@ def create_app() -> FastAPI:
     async def log_requests(
         request: Request, call_next: Callable[[Request], Awaitable[Response]]
     ) -> Response:
+        # Cleared first (defensive — a fresh request should never inherit a stale binding)
+        # then bound for the rest of this request's task, so every log line emitted while
+        # handling it — including ones several service-layer calls deep, and any
+        # BackgroundTasks that run afterward in this same task — carries request_id without
+        # each call site having to pass it explicitly. merge_contextvars already does this
+        # merge; binding here is what actually gives it something to merge.
+        structlog.contextvars.clear_contextvars()
         request_id = str(uuid.uuid4())
+        structlog.contextvars.bind_contextvars(request_id=request_id)
         start = time.perf_counter()
         response = await call_next(request)
         duration_ms = round((time.perf_counter() - start) * 1000, 2)
         logger.info(
             "http_request",
-            request_id=request_id,
             method=request.method,
             path=request.url.path,
             status_code=response.status_code,

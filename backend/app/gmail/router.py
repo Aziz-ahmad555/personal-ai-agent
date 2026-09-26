@@ -2,6 +2,7 @@ import uuid
 from typing import Annotated
 
 import httpx
+import structlog
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy import delete, select
@@ -112,6 +113,7 @@ async def oauth_callback(request: Request) -> RedirectResponse:
 
 
 async def _run_sync_in_background(sync_run_id: uuid.UUID) -> None:
+    structlog.contextvars.bind_contextvars(task_id=str(sync_run_id))
     async with db_base.async_session_factory() as db:
         await run_sync(db, sync_run_id)
 
