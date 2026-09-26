@@ -1,8 +1,14 @@
 """Report drafting: the LLM sees only already-persisted, already-scored claims (never raw
 source text) and must cite each sentence with an inline [claim_id] marker. Plain code then
-strips out any marker that doesn't match a real claim id before the report is stored — the
-model cannot introduce an unattributed fact into the final summary. Provider-agnostic, like
-app.research.extraction."""
+drops any *sentence* whose marker doesn't match a real claim id before the report is stored
+— not just the marker itself, since "The role pays $200k [bogus]" stripped down to "The role
+pays $200k" is exactly as unattributed an assertion as one with no citation at all. The model
+cannot introduce an unattributed fact that survives into the final summary this way.
+Provider-agnostic, like app.research.extraction.
+
+A sentence with no marker at all is left untouched — that's a separate, harder problem (the
+model asserting something with no citation whatsoever, rather than a citation that fails to
+resolve) that this module doesn't attempt to solve."""
 
 import re
 from dataclasses import dataclass
@@ -46,6 +52,10 @@ REPORT_SCHEMA = {
 }
 
 _MARKER_RE = re.compile(r"\[([a-zA-Z0-9_-]+)\]")
+# Splits on the whitespace following a sentence-ending punctuation mark, keeping that
+# punctuation attached to the sentence before it — good enough for the short, schema-
+# constrained summaries this module produces (not a general-purpose sentence tokenizer).
+_SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])\s+")
 
 
 @dataclass
@@ -76,20 +86,24 @@ def _build_user_message(query_text: str, purpose: str | None, claims: list[Claim
     return "\n".join(parts)
 
 
-def _strip_unknown_markers(summary: str, known_ids: set[str]) -> tuple[str, list[str]]:
-    """Removes any [marker] that isn't a known claim id, so an invented citation can never
-    render as if it were real. Returns the cleaned summary and the ids actually referenced."""
+def _drop_unsupported_sentences(summary: str, known_ids: set[str]) -> tuple[str, list[str]]:
+    """Drops any *sentence* containing a [marker] that isn't a known claim id — not just the
+    bracket — so an invented citation can never leave its assertion behind, stripped of the
+    one thing that would have revealed it as unsupported. Returns the cleaned summary and the
+    ids actually referenced by the sentences that survived."""
     referenced: list[str] = []
+    kept: list[str] = []
 
-    def _replace(match: re.Match[str]) -> str:
-        marker = match.group(1)
-        if marker in known_ids:
-            referenced.append(marker)
-            return match.group(0)
-        return ""
+    for sentence in _SENTENCE_SPLIT_RE.split(summary):
+        if not sentence.strip():
+            continue
+        markers = _MARKER_RE.findall(sentence)
+        if markers and not all(marker in known_ids for marker in markers):
+            continue  # at least one citation doesn't resolve — drop the whole sentence
+        referenced.extend(marker for marker in markers if marker in known_ids)
+        kept.append(sentence)
 
-    cleaned = _MARKER_RE.sub(_replace, summary)
-    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    cleaned = re.sub(r"\s+", " ", " ".join(kept)).strip()
     return cleaned, referenced
 
 
@@ -119,7 +133,7 @@ async def draft_report(
     )
 
     known_ids = {claim.id for claim in claims}
-    cleaned_summary, referenced = _strip_unknown_markers(payload.get("summary", ""), known_ids)
+    cleaned_summary, referenced = _drop_unsupported_sentences(payload.get("summary", ""), known_ids)
     return ReportDraft(
         summary=cleaned_summary or "The available claims did not yield a clear summary.",
         uncertainties=payload.get("uncertainties", []),

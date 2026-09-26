@@ -1,12 +1,14 @@
 """The LLM-judge: scores a Research Engine report's summary for faithfulness (does it only
 assert what the given claims actually support) and relevance (does it answer the question).
 
-This exists because of a real, specific gap in app.research.report.draft_report: the code only
-strips an [id] marker that doesn't match a real claim — it does NOT remove the surrounding
-sentence, so a sentence can survive with its fake citation stripped but its unsupported
-assertion intact (e.g. "The role pays $200k [bogus]" -> "The role pays $200k"). Citation
-*existence* is already deterministically guaranteed; narrative faithfulness of the resulting
-free text is not, and that's what needs a judge rather than more code.
+This exists because citation *existence* alone doesn't guarantee narrative faithfulness. A
+real, specific version of that gap was found while building this harness — draft_report used
+to strip only an [id] marker that didn't match a real claim, leaving the surrounding sentence's
+unsupported assertion intact (e.g. "The role pays $200k [bogus]" -> "The role pays $200k") —
+and is now fixed at the code level (app.research.report._drop_unsupported_sentences drops the
+whole sentence). But a sentence with no citation marker at all, or one that subtly overstates
+what its real citation actually says, isn't something more string-matching code can reliably
+catch — that's what still needs a judge.
 
 Calibration: judge_calibration() runs the judge against a small, hand-labeled gold set
 (evals/datasets/research_judge_gold.json) and reports its agreement rate with those labels —

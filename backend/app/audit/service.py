@@ -34,11 +34,21 @@ async def log_action(
     result: dict[str, Any] | None = None,
     error: str | None = None,
 ) -> AuditLog:
-    """For an action that already ran (green, or the executed effect of a previously
-    approved yellow/red action) — recorded as a completed/failed fact, never a pending
-    question."""
-    if risk_level not in RISK_LEVELS:
-        raise ValueError(f"Unknown risk_level: {risk_level!r}")
+    """For a green action that already ran automatically, with no approval step at all —
+    recorded as a completed/failed fact, never a pending question.
+
+    Deliberately green-only: a yellow/red action's completion is recorded by record_result,
+    against the specific AuditLog row request_approval/decide_approval already produced and
+    approved — never by log_action, which has no way to verify any approval ever happened.
+    Earlier, this accepted any risk_level and only validated the string, which meant nothing
+    stopped a red-risk action from being logged as already-completed with no approval step
+    at all — closed here rather than left as a silent trust boundary."""
+    if risk_level != "green":
+        raise ApprovalError(
+            "log_action only records green actions that ran automatically. A yellow/red "
+            "action's completion must go through request_approval, decide_approval, and "
+            "record_result — never log_action, which can't verify an approval happened."
+        )
 
     log = AuditLog(
         user_id=user_id,
@@ -133,7 +143,11 @@ async def decide_approval(
                     "No independent second check is registered for this action; a red-risk "
                     "action cannot be approved without one."
                 )
-            if not await check(db, pending):
+            # `is not True`, not `not ...`: a second check must return the actual boolean
+            # True to pass. Python truthiness would let a check that mistakenly returns a
+            # non-empty string (e.g. "no", meant as a failure) be misread as passing, since
+            # `not "no"` is False — this fails closed on anything that isn't literally True.
+            if await check(db, pending) is not True:
                 raise ApprovalError(
                     "The independent second check did not pass; approval was not honored."
                 )

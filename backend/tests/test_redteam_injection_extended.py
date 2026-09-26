@@ -8,11 +8,13 @@ doesn't reach:
    verifier families (cover letter, resume rewrite, deal-breakers, practice feedback) — proving
    robustness comes from the verifier's logic, not from recognizing any particular phrasing.
 2. Audit second-check registry robustness beyond the one self-forgery case Phase 10 already
-   covers — a check that raises, a check that returns a truthy non-bool, and exact-match
+   covers — a check that raises, a check that returns a truthy non-bool (found a real
+   truthiness bug this way, now fixed in app.audit.service.decide_approval), and exact-match
    action-string lookup.
 3. Phase 11-specific surface: does a scheduled action's audit trail stay indistinguishable in
    shape/risk-level from a manual one, and does log_action's own risk_level parameter enforce
-   anything beyond validating the string (spoiler: it doesn't — a genuine structural finding).
+   anything beyond validating the string (found a real gap this way too — it didn't — now
+   fixed by restricting log_action to green-only).
 
 Cross-user isolation is deliberately NOT re-tested here — tests/test_redteam_isolation.py
 already covers it exhaustively; evals/buckets/audit.py reports that file's pass count as
@@ -215,22 +217,19 @@ async def test_a_second_check_that_raises_fails_closed_not_open(
         assert still_pending.status == "pending_approval"
 
 
-async def test_FINDING_a_second_check_returning_a_truthy_non_bool_string_is_treated_as_passing(
+async def test_a_second_check_returning_a_truthy_non_bool_string_is_rejected(
     session_factory: async_sessionmaker[AsyncSession], monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Real finding, not fixed here (flagged to the user): decide_approval gates on
+    """Was a real finding, now fixed: decide_approval used to gate on
     `if not await check(db, pending):`, which uses Python truthiness, not `is True`. A second
-    check implementation that mistakenly returns a non-empty string like "no" or "failed"
-    instead of an actual bool False is *truthy*, so `not "no"` is False and approval proceeds
-    anyway. SECOND_CHECKS is typed as Callable[..., Awaitable[bool]], so mypy would catch a
-    badly-typed implementation *if it's type-checked* — this is a runtime gap for anything
-    that isn't. Currently latent (no real second-check implementation exists yet to get this
-    wrong), but worth fixing (e.g. `if await check(...) is not True:`) before the first real
-    one ships."""
+    check implementation that mistakenly returns a non-empty string like "no" (meant as a
+    failure) is *truthy* in Python, so `not "no"` was False and approval proceeded anyway.
+    Fixed to `if await check(...) is not True:` — only a literal True passes; anything else,
+    including a wrongly-typed truthy value, fails closed."""
     action = "ext.truthy_string_check_action"
 
     async def _wrongly_typed_check(db: AsyncSession, log: AuditLog) -> bool:
-        return "no"  # type: ignore[return-value]  # deliberately wrong, that's the finding
+        return "no"  # type: ignore[return-value]  # deliberately wrong, that's the point
 
     monkeypatch.setitem(second_checks.SECOND_CHECKS, action, _wrongly_typed_check)
 
@@ -241,13 +240,12 @@ async def test_FINDING_a_second_check_returning_a_truthy_non_bool_string_is_trea
         )
         await db.commit()
 
-        approved = await decide_approval(
-            db, audit_log_id=pending.id, user_id=user.id, approved=True
-        )
+        with pytest.raises(ApprovalError, match="did not pass"):
+            await decide_approval(db, audit_log_id=pending.id, user_id=user.id, approved=True)
 
-    # Today's actual behavior: this succeeds, even though the check function clearly meant
-    # to signal failure. Recorded as a known, reported gap — not asserted as correct.
-    assert approved.status == "approved"
+        still_pending = await db.get(AuditLog, pending.id)
+        assert still_pending is not None
+        assert still_pending.status == "pending_approval"
 
 
 async def test_second_check_lookup_is_exact_match_not_fuzzy(
@@ -309,33 +307,26 @@ async def test_a_scheduled_actions_audit_shape_is_indistinguishable_from_a_manua
     assert manual.status == scheduled.status == "completed"
 
 
-async def test_FINDING_log_action_does_not_itself_prevent_a_red_action_from_skipping_approval(
+async def test_log_action_refuses_to_record_a_red_or_yellow_action(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
-    """Real structural finding, not fixed here: log_action's docstring says it's "for an
-    action that already ran (green, or the executed effect of a previously approved
-    yellow/red action)" — but that's a naming *convention*, not something the function
-    enforces. Nothing stops a future developer from calling log_action(risk_level="red", ...)
-    directly for a genuinely risky action, completely bypassing request_approval/
-    decide_approval and the second-check registry — log_action only validates that the
-    risk_level string is one of the three known values, never that a red/yellow action
-    actually went through approval first. Today this is purely theoretical (grep confirms
-    every real red/yellow-shaped call site in app/ uses request_approval, never log_action,
-    for anything but green actions) — recorded here so a future violation is caught by this
-    test rather than discovered in production."""
+    """Was a real structural finding, now fixed: log_action used to only validate that
+    risk_level was one of the three known strings, never that a yellow/red action actually
+    went through approval first — nothing stopped a red action from being recorded as
+    already-completed with no approval step at all. Fixed by restricting log_action to green
+    only; a yellow/red action's completion must go through request_approval -> decide_approval
+    -> record_result instead, which is the only path that can verify an approval happened."""
     async with session_factory() as db:
         user = await _make_user(db)
-        # This should not be possible to call meaningfully for a red action — and yet:
-        skipped_approval = await log_action(
-            db,
-            user_id=user.id,
-            action="ext.hypothetical_bypass",
-            risk_level="red",
-            summary="A red action recorded as already-completed with no approval step at all.",
-        )
-
-    assert skipped_approval.status == "completed"  # never touched pending_approval at all
-    assert skipped_approval.risk_level == "red"
+        for risk_level in ("red", "yellow"):
+            with pytest.raises(ApprovalError):
+                await log_action(
+                    db,
+                    user_id=user.id,
+                    action="ext.hypothetical_bypass",
+                    risk_level=risk_level,
+                    summary="Should be refused before ever touching the database.",
+                )
 
 
 async def test_request_approval_still_rejects_green_even_via_the_scheduler_style_call_shape(

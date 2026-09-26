@@ -197,8 +197,13 @@ async def test_research_query_end_to_end_produces_scored_claims_and_report(
     assert bad_claim["citations"][0]["excerpt_verified"] is False
 
     assert body["report"] is not None
-    # The unknown [c99] marker must be stripped; a real marker for an actual claim survives.
+    # The whole sentence citing the unknown [c99] marker is dropped, not just the bracket —
+    # otherwise "Unverifiable claim [c99]." would survive as "Unverifiable claim.", an
+    # unattributed assertion with its only citation stripped away. A real marker for an
+    # actual claim survives untouched.
     assert "[c99]" not in body["report"]["summary"]
+    assert "Unverifiable claim" not in body["report"]["summary"]
+    assert "PyTorch" in body["report"]["summary"]
     assert good_claim["id"] in body["report"]["claim_ids"]
 
 

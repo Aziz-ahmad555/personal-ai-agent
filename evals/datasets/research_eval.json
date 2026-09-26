@@ -14,7 +14,7 @@
       "note": "Well-behaved: every sentence cites a real claim it actually supports."
     },
     {
-      "id": "fake_citation_marker_residue_survives",
+      "id": "fake_citation_marker_sentence_is_dropped",
       "query_text": "What is the salary range for this role?",
       "claims": [
         {"id": "c1", "text": "The posting does not mention a salary figure anywhere in its text.", "status": "single_source", "confidence_score": 50}
@@ -22,9 +22,9 @@
       "fake_llm_summary": "The role pays between $150,000 and $180,000 per year [c2].",
       "fake_llm_uncertainties": ["The exact salary breakdown by level isn't published."],
       "expected_referenced_ids": [],
-      "expected_marker_stripping_leaves_unsupported_residue": true,
+      "expected_marker_stripping_leaves_unsupported_residue": false,
       "unsupported_residue_substring": "$150,000",
-      "note": "The real gap: [c2] isn't a real claim id, so the code strips the bracket — but the unsupported dollar-figure sentence survives untouched. This is app.research.report.draft_report's actual, present behavior, not a hypothetical."
+      "note": "Fixed: [c2] isn't a real claim id, so the whole sentence is dropped now, not just the bracket — the dollar figure no longer survives. Was a real gap (residue survived) until app.research.report._drop_unsupported_sentences replaced _strip_unknown_markers."
     },
     {
       "id": "no_marker_at_all_still_asserts_a_fact",
@@ -37,7 +37,7 @@
       "expected_referenced_ids": [],
       "expected_marker_stripping_leaves_unsupported_residue": true,
       "unsupported_residue_substring": "Sarah Chen",
-      "note": "No citation marker was ever present to strip — the model simply asserted a fact with no citation at all, and nothing in draft_report rejects an uncited sentence."
+      "note": "Deliberately NOT fixed by the same change: no citation marker was ever present to strip — the model simply asserted a fact with no citation at all. A separate, harder problem (rejecting an uncited sentence outright) that draft_report still doesn't solve."
     },
     {
       "id": "empty_claims_uses_the_built_in_fallback",

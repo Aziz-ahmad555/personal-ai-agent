@@ -2,9 +2,10 @@
 
 Replay mode: runs the real app.research.report.draft_report against a FakeLLM (canned raw
 model output) for each evals/datasets/research_eval.json pipeline example, and checks the
-code's own marker-stripping behavior deterministically — including a concrete, reproducible
-demonstration of a real gap: draft_report only strips a citation marker that doesn't match a
-real claim id, it does not remove the (possibly unsupported) sentence around it. This is a
+code's own sentence-dropping behavior deterministically — including a regression check for a
+real gap this harness found and closed: draft_report used to strip only a citation marker that
+didn't match a real claim id, leaving the (possibly unsupported) sentence around it intact; it
+now drops the whole sentence (app.research.report._drop_unsupported_sentences). This is a
 code-correctness check, not a language-quality judgment, so it needs no judge and no live call.
 
 Live mode additionally: runs the LLM-judge (evals/judge.py) against the same hand-labeled

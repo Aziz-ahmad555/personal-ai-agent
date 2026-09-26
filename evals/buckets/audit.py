@@ -4,10 +4,11 @@ via pytest itself — never reimplemented as a second, parallel assertion system
 tests/test_redteam_isolation.py's pass count alongside it as supporting evidence, without
 re-running its cases as if they were new here.
 
-Success metric: 100% of these must pass. A "FINDING"-prefixed test that documents a known,
-reported gap still counts as passing (it's asserting today's real, gap-including behavior on
-purpose) — a bucket failure here means a case caught something *newly* wrong, not that a
-pre-existing, already-flagged gap still exists.
+Success metric: 100% of these must pass. Two of these cases originally documented real gaps
+this harness found (decide_approval's truthiness bug, log_action's missing red/yellow guard)
+— both are now fixed in app/audit/service.py, and the tests were rewritten to assert the fixed
+behavior rather than the bug, so a bucket failure here always means something is newly wrong,
+never a pre-existing, already-accepted gap.
 """
 
 import re
