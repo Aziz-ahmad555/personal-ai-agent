@@ -110,6 +110,20 @@ The LLM step is behind a provider interface (`app/research/llm.py`, `LLMProvider
 
 Requires `TAVILY_API_KEY` and (`GEMINI_API_KEY` or `ANTHROPIC_API_KEY`, matching `LLM_PROVIDER`) in `.env` to actually run; without them the query fails cleanly with a clear `error` field rather than hanging or fabricating a result.
 
+## Privacy
+
+This is a single-user, self-hosted agent: everything it stores lives in **your own local Postgres database** (the Docker Compose container above), never a third-party server this project controls. Nothing leaves that database except the specific third-party call a feature actually makes — Tavily for a search, Voyage for an embedding, Gemini/Anthropic/Groq for an LLM step, or the Gmail/Calendar/GitHub APIs for those integrations — and only the minimum that call needs, never a bulk export.
+
+**What's stored:** your profile (bio, work history, education, skills and their evidence history), preferences, research queries/claims/sources, career data (postings, matches, employer/fraud checks, applications, tailored resumes, cover letters, practice sessions), a weekly digest snapshot, and — once connected — Gmail message metadata + plain-text body (no raw MIME, no attachments; see Phase 5 above), a read-only snapshot of Calendar events, and GitHub repo/skill-evidence metadata. Every risky action taken or proposed is separately recorded in the audit trail (`AuditLog`: what, why, evidence, risk level, decision, result) via `app/audit/`.
+
+**What's specifically protected:** passwords are hashed (never stored or logged in plain text); Gmail/Calendar/GitHub OAuth tokens are Fernet-encrypted at rest (`TOKEN_ENCRYPTION_KEY`) and never returned by any endpoint or written to a log or the audit trail. A real secrets scan (regex-based, against the full git history, not just the working tree) has been run against this repo and found no live credentials.
+
+**Retention:** nothing expires automatically. Gmail's first sync is bounded to a rolling window (`GMAIL_SYNC_WINDOW_DAYS`, data-minimization by default) rather than the whole mailbox; everything else persists until you remove it.
+
+**Deleting your data**, two ways:
+- **Per integration**: each of Gmail/Calendar/GitHub's own `/connection` DELETE endpoint disconnects and revokes the grant at the provider (Google/GitHub), with an explicit choice to also purge that integration's synced data — never a silent default either way.
+- **Everything, for real**: `POST /auth/delete-account/request` returns a live evidence snapshot (real row counts, real connection statuses) as a pending red-risk approval; `POST /auth/delete-account/{id}/decide` with `{"approved": true}` is your second, explicit confirmation — it re-verifies that snapshot against the database at that exact moment (refusing if anything's changed since the request, rather than deleting against stale evidence), then revokes every connected integration at its provider and deletes every row this account owns, all in the same call. This is a genuine full-account wipe (`app/auth/account_deletion.py`), not a per-integration purge repeated three times. One honest tradeoff: the account's own audit-log rows are themselves owned by the account, so they're deleted along with everything else — the one thing that outlives a completed deletion is a structured log line written just before it, in the app's own log output, outside Postgres entirely.
+
 ## Stack
 
 - **Backend**: FastAPI (async), Pydantic v2, SQLAlchemy 2.0 (async) + Alembic, PostgreSQL + pgvector, Redis, structlog, JWT auth via OAuth2 password flow, Voyage AI for embeddings, LangGraph for the Research Engine pipeline, Tavily for search, Gemini/Anthropic for claim extraction and report drafting, Gmail API (read-only) via a hand-rolled async OAuth2 client.
