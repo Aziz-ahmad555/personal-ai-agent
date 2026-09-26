@@ -235,7 +235,12 @@ async def test_digest_surfaces_needs_attention_signals(
                 user_id=user_id,
                 job_posting_id=overdue_job,
                 status="applied",
-                next_action_on=date.today() - timedelta(days=1),
+                # UTC's date, not date.today()'s local one — the service computes "today"
+                # as datetime.now(UTC).date() (see reporting/service.py), and the two
+                # disagree for several hours a day in any timezone ahead of UTC (this
+                # local machine included), which silently turned "overdue" into
+                # "due_today" whenever a test happened to run in that window.
+                next_action_on=now.date() - timedelta(days=1),
                 next_action_text="Follow up with recruiter",
             )
         )
