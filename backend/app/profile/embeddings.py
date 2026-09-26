@@ -1,5 +1,7 @@
+import asyncio
 import uuid
 
+import voyageai.error as voyage_errors
 from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from voyageai.client_async import AsyncClient
@@ -11,6 +13,20 @@ from app.profile.models import ProfileEmbedding
 logger = get_logger(__name__)
 
 _client: AsyncClient | None = None
+
+# Mirrors app.research.llm's retry shape. Voyage's own hierarchy already separates transient
+# failures (rate limit, server-side overload, a dropped connection) from permanent ones (bad
+# key, malformed request) — unlike Tavily's, so no status-code guessing is needed here.
+_TRANSIENT_ERRORS = (
+    voyage_errors.RateLimitError,
+    voyage_errors.ServerError,
+    voyage_errors.ServiceUnavailableError,
+    voyage_errors.Timeout,
+    voyage_errors.TryAgain,
+    voyage_errors.APIConnectionError,
+)
+_MAX_RETRY_ATTEMPTS = 4
+_RETRY_BASE_DELAY_SECONDS = 2.0
 
 
 def _get_client() -> AsyncClient | None:
@@ -48,11 +64,27 @@ async def embed_texts(
         return None
 
     settings = get_settings()
-    try:
-        result = await client.embed(texts, model=settings.voyage_model, input_type=input_type)
-    except Exception as exc:
-        logger.warning("embeddings_skipped_api_error", error=str(exc))
-        return None
+    attempt = 0
+    while True:
+        attempt += 1
+        try:
+            result = await client.embed(texts, model=settings.voyage_model, input_type=input_type)
+            break
+        except Exception as exc:
+            transient = isinstance(exc, _TRANSIENT_ERRORS)
+            if not transient or attempt >= _MAX_RETRY_ATTEMPTS:
+                logger.warning(
+                    "embeddings_skipped_api_error", attempts=attempt, error=str(exc)
+                )
+                return None
+            delay = _RETRY_BASE_DELAY_SECONDS * (2 ** (attempt - 1))
+            logger.warning(
+                "voyage_transient_error_retrying",
+                attempt=attempt,
+                delay_seconds=delay,
+                error=str(exc),
+            )
+            await asyncio.sleep(delay)
     return [[float(value) for value in vector] for vector in result.embeddings]
 
 

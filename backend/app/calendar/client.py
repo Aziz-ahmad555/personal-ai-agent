@@ -3,12 +3,24 @@ integration uses. Only GET requests exist in this module; there is no write help
 by mistake — a test asserts that (see tests/test_calendar_oauth.py).
 """
 
+import asyncio
 from dataclasses import dataclass
 from typing import Any
 
 import httpx
 
+from app.logging import get_logger
+
+logger = get_logger(__name__)
+
 CALENDAR_API_BASE = "https://www.googleapis.com/calendar/v3"
+
+# Mirrors app.research.llm's retry shape: a rate limit (429) or server-side overload
+# (5xx) is usually gone within seconds; a 401/410 never resolves itself by waiting, so
+# those are left for _raise_for_status to turn into their own typed errors immediately.
+_TRANSIENT_STATUS_CODES = {429, 500, 502, 503, 504}
+_MAX_RETRY_ATTEMPTS = 4
+_RETRY_BASE_DELAY_SECONDS = 2.0
 
 
 class CalendarApiError(RuntimeError):
@@ -29,6 +41,33 @@ def _auth_header(access_token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {access_token}"}
 
 
+async def _get_with_retry(
+    client: httpx.AsyncClient,
+    url: str,
+    *,
+    headers: dict[str, str],
+    params: dict[str, str] | None = None,
+) -> httpx.Response:
+    """A single GET with exponential-backoff retry, but only for transient failures — a
+    401 or 410 is returned as-is on the first attempt, since _raise_for_status must turn
+    those into their own typed errors right away rather than being retried."""
+    attempt = 0
+    while True:
+        response = await client.get(url, headers=headers, params=params)
+        attempt += 1
+        if response.status_code not in _TRANSIENT_STATUS_CODES or attempt >= _MAX_RETRY_ATTEMPTS:
+            return response
+        delay = _RETRY_BASE_DELAY_SECONDS * (2 ** (attempt - 1))
+        logger.warning(
+            "calendar_api_transient_error_retrying",
+            url=url,
+            status=response.status_code,
+            attempt=attempt,
+            delay_seconds=delay,
+        )
+        await asyncio.sleep(delay)
+
+
 def _raise_for_status(response: httpx.Response) -> None:
     if response.status_code == 401:
         raise CalendarAuthError("Google rejected the access token.")
@@ -42,8 +81,8 @@ async def get_primary_calendar(client: httpx.AsyncClient, access_token: str) -> 
     """The user's primary calendar. Its `id` is their Google account email — the same
     convention Gmail's callback uses `/profile`'s emailAddress for, this is Calendar's
     equivalent proof of which account was actually granted."""
-    response = await client.get(
-        f"{CALENDAR_API_BASE}/calendars/primary", headers=_auth_header(access_token)
+    response = await _get_with_retry(
+        client, f"{CALENDAR_API_BASE}/calendars/primary", headers=_auth_header(access_token)
     )
     _raise_for_status(response)
     result: dict[str, object] = response.json()
@@ -86,7 +125,8 @@ async def list_events(
     if page_token:
         params["pageToken"] = page_token
 
-    response = await client.get(
+    response = await _get_with_retry(
+        client,
         f"{CALENDAR_API_BASE}/calendars/primary/events",
         headers=_auth_header(access_token),
         params=params,

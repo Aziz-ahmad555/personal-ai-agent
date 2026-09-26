@@ -62,10 +62,61 @@ async def test_a_401_is_an_auth_error_and_a_410_is_a_sync_token_error() -> None:
     async with _api(lambda r: httpx.Response(410)) as http:
         with pytest.raises(gcal.SyncTokenExpiredError):
             await gcal.list_events(http, "token", sync_token="stale")
-    async with _api(lambda r: httpx.Response(503)) as http:
+
+
+async def test_a_401_or_410_fails_on_the_first_attempt_without_retrying(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(gcal, "_RETRY_BASE_DELAY_SECONDS", 0.001)
+    calls = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(request)
+        return httpx.Response(401)
+
+    async with _api(handler) as http:
+        with pytest.raises(gcal.CalendarAuthError):
+            await gcal.list_events(http, "bad")
+
+    assert len(calls) == 1
+
+
+async def test_a_persistent_503_retries_up_to_the_max_then_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(gcal, "_RETRY_BASE_DELAY_SECONDS", 0.001)
+    calls = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(request)
+        return httpx.Response(503)
+
+    async with _api(handler) as http:
         with pytest.raises(gcal.CalendarApiError) as caught:
             await gcal.list_events(http, "token")
         assert not isinstance(caught.value, gcal.CalendarAuthError | gcal.SyncTokenExpiredError)
+
+    assert len(calls) == gcal._MAX_RETRY_ATTEMPTS
+
+
+async def test_a_transient_503_retries_then_succeeds(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(gcal, "_RETRY_BASE_DELAY_SECONDS", 0.001)
+    fake = FakeCalendar()
+    fake.events_page([event("e1")])
+    calls = {"n": 0}
+    real_handler = fake.handler
+
+    def flaky_handler(request: httpx.Request) -> httpx.Response:
+        calls["n"] += 1
+        if calls["n"] < 3:
+            return httpx.Response(503)
+        return real_handler(request)
+
+    async with _api(flaky_handler) as http:
+        page = await gcal.list_events(http, "token")
+
+    assert [e["id"] for e in page.events] == ["e1"]
+    assert calls["n"] == 3
 
 
 async def test_an_unexpected_events_shape_is_rejected() -> None:

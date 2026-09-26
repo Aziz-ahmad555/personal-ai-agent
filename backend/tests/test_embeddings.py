@@ -2,6 +2,7 @@ import types
 import uuid
 
 import pytest
+import voyageai.error as voyage_errors
 from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -41,6 +42,65 @@ async def test_embed_texts_returns_none_on_api_error_instead_of_raising(
     result = await _real_embed_texts(["some text"])
 
     assert result is None
+
+
+async def test_embed_texts_retries_a_transient_error_then_succeeds(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(embeddings, "_RETRY_BASE_DELAY_SECONDS", 0.001)
+    calls = {"n": 0}
+
+    class _FakeClient:
+        async def embed(self, texts: list[str], *, model: str, input_type: str) -> object:
+            calls["n"] += 1
+            if calls["n"] < 3:
+                raise voyage_errors.RateLimitError("rate limited")
+            return types.SimpleNamespace(embeddings=[[0.1] * 512 for _ in texts])
+
+    monkeypatch.setattr(embeddings, "_get_client", lambda: _FakeClient())
+
+    result = await _real_embed_texts(["some text"])
+
+    assert result is not None and len(result[0]) == 512
+    assert calls["n"] == 3
+
+
+async def test_embed_texts_gives_up_after_max_attempts_of_a_transient_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(embeddings, "_RETRY_BASE_DELAY_SECONDS", 0.001)
+    calls = {"n": 0}
+
+    class _FakeClient:
+        async def embed(self, texts: list[str], *, model: str, input_type: str) -> None:
+            calls["n"] += 1
+            raise voyage_errors.ServiceUnavailableError("down")
+
+    monkeypatch.setattr(embeddings, "_get_client", lambda: _FakeClient())
+
+    result = await _real_embed_texts(["some text"])
+
+    assert result is None
+    assert calls["n"] == embeddings._MAX_RETRY_ATTEMPTS
+
+
+async def test_embed_texts_does_not_retry_a_permanent_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(embeddings, "_RETRY_BASE_DELAY_SECONDS", 0.001)
+    calls = {"n": 0}
+
+    class _FakeClient:
+        async def embed(self, texts: list[str], *, model: str, input_type: str) -> None:
+            calls["n"] += 1
+            raise voyage_errors.AuthenticationError("bad key")
+
+    monkeypatch.setattr(embeddings, "_get_client", lambda: _FakeClient())
+
+    result = await _real_embed_texts(["some text"])
+
+    assert result is None
+    assert calls["n"] == 1
 
 
 async def test_embed_query_uses_query_input_type(monkeypatch: pytest.MonkeyPatch) -> None:
