@@ -1,6 +1,7 @@
 import uuid
 from typing import Annotated
 
+import structlog
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -41,6 +42,7 @@ from app.db import base as db_base
 from app.db.base import get_db
 from app.db.models import User
 from app.logging import get_logger
+from app.research.llm import start_cost_guarded_task
 
 logger = get_logger(__name__)
 
@@ -207,6 +209,10 @@ async def delete_feed(
 
 
 async def _poll_feed_in_background(feed_id: uuid.UUID) -> None:
+    # A fresh id per call, not feed_id — the same feed is polled repeatedly (manually and
+    # on the scheduler's own interval), so feed_id alone wouldn't stay unique per invocation.
+    structlog.contextvars.bind_contextvars(task_id=str(uuid.uuid4()))
+    start_cost_guarded_task()  # enables SpendGuardedProvider's enforcement for this task
     async with db_base.async_session_factory() as db:
         feed = await db.get(JobBoardFeed, feed_id)
         if feed is None:
@@ -253,6 +259,9 @@ async def delete_job(
 
 
 async def _verify_job_in_background(job_id: uuid.UUID, user_id: uuid.UUID) -> None:
+    # A fresh id per call — re-verification of the same job is possible, so job_id alone
+    # wouldn't stay unique per invocation.
+    structlog.contextvars.bind_contextvars(task_id=str(uuid.uuid4()))
     async with db_base.async_session_factory() as db:
         await verify_and_assess_job(db, job_id, user_id=user_id)
         await db.commit()
@@ -271,6 +280,10 @@ async def verify_job(
 
 
 async def _match_job_in_background(job_id: uuid.UUID, user_id: uuid.UUID) -> None:
+    # A fresh id per call — re-matching the same job is possible, so job_id alone wouldn't
+    # stay unique per invocation.
+    structlog.contextvars.bind_contextvars(task_id=str(uuid.uuid4()))
+    start_cost_guarded_task()  # enables SpendGuardedProvider's enforcement for this task
     async with db_base.async_session_factory() as db:
         await run_match(db, job_id, user_id=user_id)
         await db.commit()

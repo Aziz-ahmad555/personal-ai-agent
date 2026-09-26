@@ -13,10 +13,12 @@ import json
 import time
 from contextvars import ContextVar
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Any, Protocol, cast
 
 from app.config import Settings
 from app.logging import get_logger
+from app.research.cost_models import LLMSpendLedger  # noqa: F401 — registers model metadata
 
 logger = get_logger(__name__)
 
@@ -366,7 +368,7 @@ class GroqLLMProvider:
         raise LLMError("Groq response did not include the expected tool call.")
 
 
-def get_llm_provider(settings: Settings) -> LLMProvider:
+def _build_provider(settings: Settings) -> LLMProvider:
     if settings.llm_provider == "gemini":
         if not settings.gemini_api_key:
             raise LLMError(
@@ -394,3 +396,157 @@ def get_llm_provider(settings: Settings) -> LLMProvider:
         return GroqLLMProvider(api_key=settings.groq_api_key, model=settings.groq_model)
 
     raise LLMError(f"Unknown LLM_PROVIDER setting: {settings.llm_provider!r}")
+
+
+# USD per 1,000 tokens. Mirrors evals/config.py's MODEL_PRICING — that file can't be
+# imported from here (evals/ is a separate tool that imports *from* the backend, not the
+# other way around), so this is a small, deliberately duplicated subset covering only the
+# models Settings can actually select. A published list-price estimate, not a live lookup;
+# update both tables together when a provider's pricing changes.
+_MODEL_PRICING: dict[str, tuple[float, float]] = {
+    "openai/gpt-oss-120b": (0.00015, 0.00060),
+    "gemini-3.6-flash": (0.00010, 0.00040),
+    "claude-haiku-4-5-20251001": (0.00100, 0.00500),
+}
+
+
+def _estimate_cost_usd(model: str, tokens_in: int, tokens_out: int) -> float:
+    input_per_1k, output_per_1k = _MODEL_PRICING.get(model, (0.0, 0.0))
+    return (tokens_in / 1000) * input_per_1k + (tokens_out / 1000) * output_per_1k
+
+
+# False (the default) means the cost guard's checks and its LLMSpendLedger writes are both
+# skipped entirely — deliberately separate from _call_records/record_llm_calls above, which
+# the eval harness also sets for its own cost *reporting* against a dedicated eval database
+# (see evals/db.py). If the guard gated on that same contextvar instead, an eval --live run
+# would start writing real spend into, and getting capped by, the production app's own
+# LLMSpendLedger through db_base.async_session_factory — the exact cross-contamination
+# evals/db.py's own docstring says never happens. Only a real task-boundary function in the
+# running app (app.core.scheduler, every *_in_background function) calls start_cost_guarded_task
+# to turn this on; the eval harness never does.
+_cost_guard_enabled: ContextVar[bool] = ContextVar("_cost_guard_enabled", default=False)
+
+
+def start_cost_guarded_task() -> list[LLMCallRecord]:
+    """Marks the current task as one SpendGuardedProvider should actually enforce limits
+    for, and starts recording its calls (via record_llm_calls) so the per-task token check
+    has something to sum. Call this at the top of every real background-task entry point
+    that makes an LLM call — see app.core.scheduler and the *_in_background functions across
+    app.research/app.career for where. Never call this from eval code (see the note on
+    _cost_guard_enabled above)."""
+    _cost_guard_enabled.set(True)
+    return record_llm_calls()
+
+
+class SpendGuardedProvider:
+    """Wraps whichever real LLMProvider get_llm_provider() would otherwise return, so every
+    real call site is covered without each one opting in — provided its task boundary called
+    start_cost_guarded_task() (see above); otherwise this is a complete no-op passthrough,
+    which is what keeps eval runs from touching the production ledger. Enforces the two
+    limits in Settings:
+
+    - max_tokens_per_task: refused once this task's own already-completed calls (summed from
+      the list start_cost_guarded_task() returned) already total at or beyond the limit.
+      Catches a task's calls looping out of control, not a single oversized call — token
+      count isn't knowable before a call completes.
+    - daily_spend_cap_usd: refused once today's persisted LLMSpendLedger total is at or
+      beyond the cap — a real, durable total that survives a restart, not an in-memory
+      counter that quietly forgets on one.
+
+    Both checks run before the call is even attempted; a call that's refused never reaches
+    the provider and is never ledgered. A ledger row is written only after a real call
+    actually succeeds, so the ledger stays an honest account of tokens actually spent."""
+
+    def __init__(self, inner: LLMProvider, settings: Settings) -> None:
+        self._inner = inner
+        self._settings = settings
+
+    async def generate_structured(
+        self,
+        *,
+        system: str,
+        user_message: str,
+        schema_name: str,
+        schema_description: str,
+        json_schema: dict[str, Any],
+        max_tokens: int,
+    ) -> dict[str, Any]:
+        if not _cost_guard_enabled.get():
+            return await self._inner.generate_structured(
+                system=system,
+                user_message=user_message,
+                schema_name=schema_name,
+                schema_description=schema_description,
+                json_schema=json_schema,
+                max_tokens=max_tokens,
+            )
+
+        records = _call_records.get()
+        if records is not None:
+            tokens_so_far = sum((r.tokens_in or 0) + (r.tokens_out or 0) for r in records)
+            if tokens_so_far >= self._settings.max_tokens_per_task:
+                raise LLMError(
+                    f"This task has already used {tokens_so_far} tokens, at or beyond the "
+                    f"{self._settings.max_tokens_per_task}-token per-task limit — refusing "
+                    "to make another LLM call."
+                )
+
+        spent_today = await self._spent_today()
+        if spent_today >= self._settings.daily_spend_cap_usd:
+            raise LLMError(
+                f"Today's estimated LLM spend (${spent_today:.4f}) is at or beyond the "
+                f"${self._settings.daily_spend_cap_usd:.2f} daily cap — refusing to make "
+                "another LLM call until it resets."
+            )
+
+        before = len(records) if records is not None else 0
+        result = await self._inner.generate_structured(
+            system=system,
+            user_message=user_message,
+            schema_name=schema_name,
+            schema_description=schema_description,
+            json_schema=json_schema,
+            max_tokens=max_tokens,
+        )
+
+        records_after = _call_records.get()
+        if records_after is not None and len(records_after) > before:
+            await self._ledger(records_after[-1])
+        return result
+
+    @staticmethod
+    async def _spent_today() -> float:
+        from sqlalchemy import func, select
+
+        from app.db import base as db_base
+
+        start_of_day = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
+        async with db_base.async_session_factory() as db:
+            total = await db.scalar(
+                select(func.coalesce(func.sum(LLMSpendLedger.estimated_cost_usd), 0.0)).where(
+                    LLMSpendLedger.created_at >= start_of_day
+                )
+            )
+        return float(total or 0.0)
+
+    @staticmethod
+    async def _ledger(record: "LLMCallRecord") -> None:
+        from app.db import base as db_base
+
+        tokens_in = record.tokens_in or 0
+        tokens_out = record.tokens_out or 0
+        async with db_base.async_session_factory() as db:
+            db.add(
+                LLMSpendLedger(
+                    provider=record.provider,
+                    model=record.model,
+                    tokens_in=tokens_in,
+                    tokens_out=tokens_out,
+                    estimated_cost_usd=_estimate_cost_usd(record.model, tokens_in, tokens_out),
+                )
+            )
+            await db.commit()
+
+
+def get_llm_provider(settings: Settings) -> LLMProvider:
+    return SpendGuardedProvider(_build_provider(settings), settings)

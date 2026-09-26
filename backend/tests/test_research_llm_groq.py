@@ -161,5 +161,9 @@ def test_get_llm_provider_returns_a_groq_provider_when_configured() -> None:
     settings = Settings.model_construct(
         llm_provider="groq", groq_api_key="fake-key", groq_model="openai/gpt-oss-120b"
     )
+    # get_llm_provider always wraps the real provider in SpendGuardedProvider (see
+    # app.research.llm) so the running app's spend/token caps apply to every call site —
+    # the real Groq provider is underneath, at ._inner.
     provider = llm.get_llm_provider(settings)
-    assert isinstance(provider, llm.GroqLLMProvider)
+    assert isinstance(provider, llm.SpendGuardedProvider)
+    assert isinstance(provider._inner, llm.GroqLLMProvider)

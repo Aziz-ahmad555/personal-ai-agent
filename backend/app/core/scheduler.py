@@ -20,6 +20,9 @@ evidence (where one exists — Gmail sync doesn't audit-log at all today, Group 
 that), so /audit/logs can distinguish an autonomous run from a manual one.
 """
 
+import uuid
+
+import structlog
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from sqlalchemy import select
 
@@ -36,6 +39,7 @@ from app.gmail import sync as gmail_sync
 from app.gmail.models import GmailConnection, GmailSyncRun
 from app.logging import get_logger
 from app.reporting.service import create_digest
+from app.research.llm import start_cost_guarded_task
 
 logger = get_logger(__name__)
 
@@ -79,6 +83,7 @@ async def run_scheduled_github_syncs() -> None:
                 )
                 continue
             run = await github_sync.start_run(db, connection.id)
+            structlog.contextvars.bind_contextvars(task_id=str(run.id))
             await github_sync.run_sync(db, run.id, trigger="scheduled")
 
 
@@ -87,6 +92,8 @@ async def run_scheduled_feed_polls() -> None:
     async with db_base.async_session_factory() as db:
         feeds = (await db.execute(select(JobBoardFeed))).scalars().all()
         for feed in feeds:
+            structlog.contextvars.bind_contextvars(task_id=str(uuid.uuid4()))
+            start_cost_guarded_task()  # enables SpendGuardedProvider's enforcement for this task
             try:
                 await career_discovery.poll_company_feed(db, feed, trigger="scheduled")
             except career_discovery.DiscoveryError:
@@ -99,6 +106,7 @@ async def run_scheduled_digest_generation() -> None:
     async with db_base.async_session_factory() as db:
         user_ids = (await db.execute(select(User.id))).scalars().all()
         for user_id in user_ids:
+            structlog.contextvars.bind_contextvars(task_id=str(uuid.uuid4()))
             await create_digest(db, user_id, trigger="scheduled")
             await db.commit()
 
@@ -145,6 +153,7 @@ async def run_scheduled_gmail_syncs() -> None:
             db.add(run)
             await db.commit()
             await db.refresh(run)
+            structlog.contextvars.bind_contextvars(task_id=str(run.id))
             await gmail_sync.run_sync(db, run.id)
 
 
@@ -181,6 +190,7 @@ async def run_scheduled_calendar_syncs() -> None:
                 )
                 continue
             run = await calendar_sync.start_run(db, connection.id)
+            structlog.contextvars.bind_contextvars(task_id=str(run.id))
             await calendar_sync.run_sync(db, run.id, trigger="scheduled")
 
 

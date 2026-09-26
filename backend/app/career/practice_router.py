@@ -1,6 +1,7 @@
 import uuid
 from typing import Annotated
 
+import structlog
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,6 +22,7 @@ from app.career.practice_schemas import (
 from app.db import base as db_base
 from app.db.base import get_db
 from app.db.models import User
+from app.research.llm import start_cost_guarded_task
 
 router = APIRouter(prefix="/career", tags=["career"])
 
@@ -90,12 +92,19 @@ async def _build_detail(db: AsyncSession, session: PracticeSession) -> PracticeS
 
 
 async def _questions_in_background(session_id: uuid.UUID, user_id: uuid.UUID) -> None:
+    # A fresh id per call, not session_id — question generation and feedback generation
+    # are two separate tasks against the same session, and either could in principle be
+    # retried for it, so session_id alone wouldn't stay unique per invocation.
+    structlog.contextvars.bind_contextvars(task_id=str(uuid.uuid4()))
+    start_cost_guarded_task()  # enables SpendGuardedProvider's enforcement for this task
     async with db_base.async_session_factory() as db:
         await practice_service.run_question_generation(db, session_id, user_id=user_id)
         await db.commit()
 
 
 async def _feedback_in_background(session_id: uuid.UUID, user_id: uuid.UUID) -> None:
+    structlog.contextvars.bind_contextvars(task_id=str(uuid.uuid4()))
+    start_cost_guarded_task()  # enables SpendGuardedProvider's enforcement for this task
     async with db_base.async_session_factory() as db:
         await practice_service.run_feedback_generation(db, session_id, user_id=user_id)
         await db.commit()

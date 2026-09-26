@@ -110,6 +110,17 @@ class Settings(BaseSettings):
     gmail_sync_interval_hours: int = 6
     calendar_sync_interval_hours: int = 6
 
+    # A cost guard on real LLM usage (app.research.llm._SpendGuardedProvider), not the eval
+    # harness's separate cost *reporting* (evals/config.py) — this one actually blocks a call
+    # rather than just totaling one up after the fact. max_tokens_per_task catches one task's
+    # calls looping out of control (e.g. a feed poll that keeps re-extracting); a single call
+    # that's oversized in one shot isn't caught, since token count isn't knowable before the
+    # call completes. daily_spend_cap_usd catches sustained overuse across every task in a
+    # day, checked against app.research.cost_models.LLMSpendLedger — a real, persisted total,
+    # not an in-memory counter that forgets on restart.
+    max_tokens_per_task: int = 200_000
+    daily_spend_cap_usd: float = 5.0
+
     @property
     def effective_rate_limit_storage_uri(self) -> str:
         return self.rate_limit_storage_uri or self.redis_url

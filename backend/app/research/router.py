@@ -1,6 +1,7 @@
 import uuid
 from typing import Annotated
 
+import structlog
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,6 +11,7 @@ from app.auth.deps import get_current_user
 from app.db import base as db_base
 from app.db.base import get_db
 from app.db.models import User
+from app.research.llm import start_cost_guarded_task
 from app.research.models import (
     ResearchClaim,
     ResearchQuery,
@@ -38,6 +40,8 @@ async def _run_in_background(query_id: uuid.UUID) -> None:
     way they override the get_db dependency — a plain `from ... import async_session_factory`
     would silently keep using the production engine even when get_db is overridden, since
     BackgroundTasks run outside FastAPI's dependency-injection scope."""
+    structlog.contextvars.bind_contextvars(task_id=str(query_id))
+    start_cost_guarded_task()  # enables SpendGuardedProvider's enforcement for this task
     async with db_base.async_session_factory() as db:
         await run_research_query(db, query_id)
 

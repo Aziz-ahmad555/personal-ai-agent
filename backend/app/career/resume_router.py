@@ -2,6 +2,7 @@ import re
 import uuid
 from typing import Annotated
 
+import structlog
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -22,6 +23,7 @@ from app.career.resume_schemas import (
 from app.db import base as db_base
 from app.db.base import get_db
 from app.db.models import User
+from app.research.llm import start_cost_guarded_task
 
 router = APIRouter(prefix="/career", tags=["career"])
 
@@ -89,6 +91,10 @@ async def _build_detail(db: AsyncSession, resume: TailoredResume) -> TailoredRes
 
 
 async def _tailor_in_background(job_id: uuid.UUID, user_id: uuid.UUID) -> None:
+    # job_id isn't unique per invocation (tailoring can be re-requested for the same job) —
+    # a fresh id per call is what actually traces one tailor run end-to-end.
+    structlog.contextvars.bind_contextvars(task_id=str(uuid.uuid4()))
+    start_cost_guarded_task()  # enables SpendGuardedProvider's enforcement for this task
     async with db_base.async_session_factory() as db:
         await resume_service.run_tailor(db, job_id, user_id=user_id)
         await db.commit()

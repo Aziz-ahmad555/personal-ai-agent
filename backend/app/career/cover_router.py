@@ -2,6 +2,7 @@ import re
 import uuid
 from typing import Annotated
 
+import structlog
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -24,6 +25,7 @@ from app.career.resume_service import load_base_resume
 from app.db import base as db_base
 from app.db.base import get_db
 from app.db.models import User
+from app.research.llm import start_cost_guarded_task
 
 router = APIRouter(prefix="/career", tags=["career"])
 
@@ -110,6 +112,10 @@ async def _build_detail(db: AsyncSession, letter: CoverLetter) -> CoverLetterRea
 
 
 async def _draft_in_background(job_id: uuid.UUID, user_id: uuid.UUID) -> None:
+    # job_id itself isn't unique per invocation (the same job can get a redrafted letter
+    # later) — a fresh id per call is what actually traces one draft run end-to-end.
+    structlog.contextvars.bind_contextvars(task_id=str(uuid.uuid4()))
+    start_cost_guarded_task()  # enables SpendGuardedProvider's enforcement for this task
     async with db_base.async_session_factory() as db:
         await cover_service.run_letter(db, job_id, user_id=user_id)
         await db.commit()

@@ -43,6 +43,7 @@ from app.profile.models import (  # noqa: F401 — registers model metadata
     WorkExperience,
 )
 from app.reporting.models import WeeklyDigest  # noqa: F401 — registers model metadata
+from app.research.cost_models import LLMSpendLedger  # noqa: F401 — registers model metadata
 from app.research.models import (  # noqa: F401 — registers model metadata
     ResearchClaim,
     ResearchClaimCitation,
