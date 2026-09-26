@@ -19,6 +19,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from app.research.llm import LLMProvider
+from app.research.report import NO_CLAIMS_FALLBACK_SUMMARY
 
 JUDGE_SYSTEM_PROMPT = """You are a strict fact-checking judge for a personal research
 assistant. You will be given a research question, the exact claims (with ids) the assistant
@@ -29,6 +30,12 @@ was allowed to use, and the summary it produced. Judge two things:
   counts as faithful only if the claim actually supports what the sentence says — a citation
   next to an unsupported assertion does not make it faithful. If the summary asserts anything
   the claims don't cover (a number, a name, a fact), faithful is false.
+  Also false if the summary cites a claim while silently ignoring another given claim that
+  directly contradicts it — e.g. citing "the careers page says fully remote" without
+  mentioning a given claim that says the team was actually told to return to office. Citing a
+  true claim while omitting a claim that contradicts it is still unfaithful: the reader is
+  misled into thinking the cited claim is the whole picture. A summary that acknowledges the
+  contradiction (e.g. "sources disagree here") is faithful.
 - relevant: true only if the summary actually addresses the research question asked, not a
   related-but-different topic.
 
@@ -70,6 +77,22 @@ def _build_user_message(
 async def judge_report(
     provider: LLMProvider, *, query_text: str, claims: list[dict[str, str]], summary: str
 ) -> JudgeVerdict:
+    # The app's own deterministic fallback for zero claims (app.research.report.draft_report
+    # short-circuits before ever calling a model) — scored faithful/relevant by construction,
+    # never sent to the judge as if it were generated prose. Matches CLAUDE.md's "no LLM for
+    # deterministic work": a hardcoded string doesn't need a model to grade it, and asking one
+    # to only invites exactly the false-negative a strict "assertion needs a citation" rule
+    # would produce here (an honest admission of absence isn't an uncited factual claim).
+    if not claims and summary == NO_CLAIMS_FALLBACK_SUMMARY:
+        return JudgeVerdict(
+            faithful=True,
+            relevant=True,
+            reason=(
+                "The app's built-in fallback for zero verified claims — scored by "
+                "construction, not evaluated as generated prose."
+            ),
+        )
+
     payload: dict[str, Any] = await provider.generate_structured(
         system=JUDGE_SYSTEM_PROMPT,
         user_message=_build_user_message(query_text=query_text, claims=claims, summary=summary),
@@ -119,8 +142,8 @@ async def judge_calibration(
             agreed += 1
         else:
             disagreements.append(
-                f"{example['id']}: judge said faithful={verdict.faithful} relevant={verdict.relevant} "
-                f"({verdict.reason}); human labeled faithful={example['expected_faithful']} "
-                f"relevant={example['expected_relevant']}"
+                f"{example['id']}: judge said faithful={verdict.faithful} "
+                f"relevant={verdict.relevant} ({verdict.reason}); human labeled "
+                f"faithful={example['expected_faithful']} relevant={example['expected_relevant']}"
             )
     return CalibrationResult(total=len(gold_examples), agreed=agreed, disagreements=disagreements)

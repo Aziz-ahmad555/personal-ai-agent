@@ -64,15 +64,31 @@ async def _run_retrieval_bucket(*, replay: bool) -> BucketReport:
 
 
 async def _run_live_extras(report: EvalReport) -> None:
+    """Each live sub-check is independent and must not take the rest of the run down with it
+    — a real model call can fail in ways replay mode never exercises (Groq's own tool-call
+    schema validation rejecting a malformed generation with a hard 400, for one real example
+    this harness hit), and losing every other bucket's already-computed results to one such
+    failure would defeat the point of running --live at all."""
     from app.config import get_settings
     from app.research.llm import get_llm_provider
 
     provider = get_llm_provider(get_settings())
 
-    career_live_task = await career_bucket.run_live_supplementary_check(provider)
-    report.buckets.append(BucketReport(name="career_live_injection_check", tasks=[career_live_task]))
+    try:
+        career_live_task = await career_bucket.run_live_supplementary_check(provider)
+        report.buckets.append(
+            BucketReport(name="career_live_injection_check", tasks=[career_live_task])
+        )
+    except Exception as exc:  # noqa: BLE001 - report the failure, don't crash the whole run
+        report.buckets.append(_failed_bucket("career_live_injection_check", str(exc)))
 
-    live_research = await research_bucket.run_live_supplementary(provider)
+    try:
+        live_research = await research_bucket.run_live_supplementary(provider)
+    except Exception as exc:  # noqa: BLE001 - report the failure, don't crash the whole run
+        report.buckets.append(_failed_bucket("research_judge_live", str(exc)))
+        report.buckets.append(_failed_bucket("research_baseline_comparison", str(exc)))
+        return
+
     judge_tasks = list(live_research.scoring_tasks)
     judge_tasks.append(
         TaskResult(
@@ -91,6 +107,9 @@ async def _run_live_extras(report: EvalReport) -> None:
         )
     )
     report.buckets.append(BucketReport(name="research_judge_live", tasks=judge_tasks))
+    report.buckets.append(
+        BucketReport(name="research_baseline_comparison", tasks=live_research.baseline_tasks)
+    )
 
 
 async def main() -> None:

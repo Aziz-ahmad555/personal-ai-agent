@@ -57,6 +57,10 @@ _MARKER_RE = re.compile(r"\[([a-zA-Z0-9_-]+)\]")
 # constrained summaries this module produces (not a general-purpose sentence tokenizer).
 _SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])\s+")
 
+# Named so evals/judge.py can special-case it exactly (the app's own deterministic fallback,
+# never generated prose) without duplicating the literal string and risking drift.
+NO_CLAIMS_FALLBACK_SUMMARY = "No verified claims were found for this query."
+
 
 @dataclass
 class ClaimForReport:
@@ -116,7 +120,7 @@ async def draft_report(
 ) -> ReportDraft:
     if not claims:
         return ReportDraft(
-            summary="No verified claims were found for this query.",
+            summary=NO_CLAIMS_FALLBACK_SUMMARY,
             uncertainties=["No sources could be verified well enough to support any claim."],
             referenced_claim_ids=[],
         )
