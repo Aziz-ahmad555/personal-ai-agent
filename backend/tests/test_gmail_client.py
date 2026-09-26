@@ -31,7 +31,9 @@ class _FakeHttpClient:
 
 
 def _response(status_code: int, json_body: dict[str, object]) -> httpx.Response:
-    return httpx.Response(status_code, json=json_body, request=httpx.Request("GET", "https://example.com"))
+    return httpx.Response(
+        status_code, json=json_body, request=httpx.Request("GET", "https://example.com")
+    )
 
 
 class _FakeHttpClientSequence:

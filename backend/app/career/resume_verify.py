@@ -125,6 +125,7 @@ def reorder_skills(
     original order. Returns the new order of names, or None if it wouldn't change anything.
     Reordering is a permutation of the user's own evidence-backed skills — it can't add a
     claim, so it needs no LLM."""
+
     def rank(skill: SkillItem) -> int:
         if _matches_any(skill.name, required):
             return 0
@@ -137,9 +138,7 @@ def reorder_skills(
     return names if names != [s.name for s in skills] else None
 
 
-def find_gaps(
-    base: ResumeBase, required: list[str], preferred: list[str]
-) -> list[dict[str, str]]:
+def find_gaps(base: ResumeBase, required: list[str], preferred: list[str]) -> list[dict[str, str]]:
     """Skills the posting asks for that the profile has no *evidence* for. Reported to the user,
     never written into the resume."""
     evidenced = {normalize_skill(s.name) for s in base.skills}

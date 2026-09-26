@@ -96,22 +96,30 @@ async def get_query(
     query = await _get_owned_query(db, query_id, user.id)
 
     source_rows = (
-        await db.execute(
-            select(ResearchSource)
-            .join(ResearchQuerySource, ResearchQuerySource.source_id == ResearchSource.id)
-            .where(ResearchQuerySource.query_id == query_id)
-            .order_by(ResearchQuerySource.search_rank)
+        (
+            await db.execute(
+                select(ResearchSource)
+                .join(ResearchQuerySource, ResearchQuerySource.source_id == ResearchSource.id)
+                .where(ResearchQuerySource.query_id == query_id)
+                .order_by(ResearchQuerySource.search_rank)
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
 
     claim_rows = (
-        await db.execute(
-            select(ResearchClaim)
-            .where(ResearchClaim.query_id == query_id)
-            .options(selectinload(ResearchClaim.citations))
-            .order_by(ResearchClaim.confidence_score.desc())
+        (
+            await db.execute(
+                select(ResearchClaim)
+                .where(ResearchClaim.query_id == query_id)
+                .options(selectinload(ResearchClaim.citations))
+                .order_by(ResearchClaim.confidence_score.desc())
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
 
     await db.refresh(query, attribute_names=["report"])
 

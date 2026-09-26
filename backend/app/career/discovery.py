@@ -232,9 +232,7 @@ async def poll_company_feed(
     settings = settings or get_settings()
 
     try:
-        async with httpx.AsyncClient(
-            timeout=15.0, headers={"User-Agent": USER_AGENT}
-        ) as client:
+        async with httpx.AsyncClient(timeout=15.0, headers={"User-Agent": USER_AGENT}) as client:
             if feed.board == "usajobs":
                 if not settings.usajobs_api_key or not settings.usajobs_user_agent_email:
                     raise DiscoveryError(

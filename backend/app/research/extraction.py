@@ -58,7 +58,7 @@ CLAIMS_SCHEMA = {
                         "type": "object",
                         "description": (
                             "Structured form of the claim when the fact is naturally structured, "
-                            "e.g. {\"min\": 120000, \"max\": 150000, \"currency\": \"USD\"} for a "
+                            'e.g. {"min": 120000, "max": 150000, "currency": "USD"} for a '
                             "salary range. Omit for claims that are only prose."
                         ),
                     },

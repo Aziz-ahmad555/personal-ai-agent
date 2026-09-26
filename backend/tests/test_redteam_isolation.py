@@ -311,8 +311,8 @@ async def test_no_endpoint_leaks_another_users_resource(
         if response.status_code != 404:
             failures.append(f"{description} ({method} {url}): got {response.status_code}")
 
-    assert not failures, (
-        "Endpoints that did not 404 for a foreign resource:\n" + "\n".join(failures)
+    assert not failures, "Endpoints that did not 404 for a foreign resource:\n" + "\n".join(
+        failures
     )
 
     # A random id that belongs to no one at all must behave identically — 404, not a 500 from

@@ -52,7 +52,8 @@ _DATE_RANGE_RE = re.compile(
     re.IGNORECASE,
 )
 _MONTH_NUMBERS = {
-    m: i for i, m in enumerate(
+    m: i
+    for i, m in enumerate(
         ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"], 1
     )
 }

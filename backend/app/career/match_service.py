@@ -55,8 +55,7 @@ FUZZY_SIMILARITY_THRESHOLD = 0.8
 MATCH_TIMEOUT = timedelta(minutes=10)
 
 STALLED_MESSAGE = (
-    "This match didn't finish — the server was probably restarted while it was running. "
-    "Try again."
+    "This match didn't finish — the server was probably restarted while it was running. Try again."
 )
 
 

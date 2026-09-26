@@ -167,9 +167,7 @@ class GeminiLLMProvider:
                 )
                 break
             except Exception as exc:
-                transient = (
-                    isinstance(exc, errors.APIError) and exc.code in _TRANSIENT_STATUS_CODES
-                )
+                transient = isinstance(exc, errors.APIError) and exc.code in _TRANSIENT_STATUS_CODES
                 if not transient or attempt >= _MAX_RETRY_ATTEMPTS:
                     logger.warning(
                         "gemini_generate_failed",

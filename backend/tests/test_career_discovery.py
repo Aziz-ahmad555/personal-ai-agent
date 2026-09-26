@@ -108,7 +108,11 @@ async def test_capture_job_from_url_raises_when_fetch_fails(
 ) -> None:
     async def fake_fetch_source(url: str, *, timeout_seconds: float, max_chars: int) -> FetchResult:
         return FetchResult(
-            final_url=url, http_status=404, content=None, title=None, published_at=None,
+            final_url=url,
+            http_status=404,
+            content=None,
+            title=None,
+            published_at=None,
             fetch_error="http_404",
         )
 
@@ -146,14 +150,22 @@ async def test_poll_company_feed_skips_previously_seen_postings(
 ) -> None:
     postings = [
         RawPosting(
-            external_id="1", title="Engineer A", location="Remote",
-            url="https://acme.example.com/jobs/1", posted_at="2026-09-01T00:00:00Z",
-            description="Job A description text.", raw={"id": "1"},
+            external_id="1",
+            title="Engineer A",
+            location="Remote",
+            url="https://acme.example.com/jobs/1",
+            posted_at="2026-09-01T00:00:00Z",
+            description="Job A description text.",
+            raw={"id": "1"},
         ),
         RawPosting(
-            external_id="2", title="Engineer B", location="Remote",
-            url="https://acme.example.com/jobs/2", posted_at="2026-09-02T00:00:00Z",
-            description="Job B description text.", raw={"id": "2"},
+            external_id="2",
+            title="Engineer B",
+            location="Remote",
+            url="https://acme.example.com/jobs/2",
+            posted_at="2026-09-02T00:00:00Z",
+            description="Job B description text.",
+            raw={"id": "2"},
         ),
     ]
 
@@ -210,8 +222,13 @@ async def test_poll_company_feed_dedupes_by_description_hash_across_channels(
     async def fake_fetch_greenhouse(client: object, company_slug: str) -> list[RawPosting]:
         return [
             RawPosting(
-                external_id="dup-1", title="Engineer", location="Remote", url=None,
-                posted_at=None, description=shared_description, raw={},
+                external_id="dup-1",
+                title="Engineer",
+                location="Remote",
+                url=None,
+                posted_at=None,
+                description=shared_description,
+                raw={},
             )
         ]
 

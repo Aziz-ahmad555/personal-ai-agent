@@ -50,9 +50,7 @@ async def test_the_rate_limit_response_does_not_leak_internal_details(
     for _ in range(5):
         await client.post("/auth/login", data={"username": email, "password": "wrong-guess"})
 
-    blocked = await client.post(
-        "/auth/login", data={"username": email, "password": "wrong-guess"}
-    )
+    blocked = await client.post("/auth/login", data={"username": email, "password": "wrong-guess"})
 
     assert blocked.status_code == 429
     body = str(blocked.json()).lower()

@@ -202,8 +202,10 @@ def build_pipeline(
             return {"deduped_source_ids": []}
 
         sources = (
-            await db.execute(select(ResearchSource).where(ResearchSource.id.in_(source_ids)))
-        ).scalars().all()
+            (await db.execute(select(ResearchSource).where(ResearchSource.id.in_(source_ids))))
+            .scalars()
+            .all()
+        )
         verified = [s for s in sources if s.is_verified]
 
         # Exact dedup by content hash.
@@ -235,10 +237,16 @@ def build_pipeline(
 
         if duplicate_of:
             query_sources = (
-                await db.execute(
-                    select(ResearchQuerySource).where(ResearchQuerySource.query_id == query_uuid)
+                (
+                    await db.execute(
+                        select(ResearchQuerySource).where(
+                            ResearchQuerySource.query_id == query_uuid
+                        )
+                    )
                 )
-            ).scalars().all()
+                .scalars()
+                .all()
+            )
             qs_by_source = {str(qs.source_id): qs for qs in query_sources}
             for dup_id, canonical_id in duplicate_of.items():
                 qs = qs_by_source.get(dup_id)
@@ -258,8 +266,10 @@ def build_pipeline(
         query_uuid = uuid.UUID(state["query_id"])
         deduped_ids = [uuid.UUID(s) for s in state.get("deduped_source_ids", [])]
         sources = (
-            await db.execute(select(ResearchSource).where(ResearchSource.id.in_(deduped_ids)))
-        ).scalars().all()
+            (await db.execute(select(ResearchSource).where(ResearchSource.id.in_(deduped_ids))))
+            .scalars()
+            .all()
+        )
 
         short_id_map = {f"s{i + 1}": s for i, s in enumerate(sources)}
         excerpts = [

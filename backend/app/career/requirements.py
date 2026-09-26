@@ -140,9 +140,7 @@ class DealBreakerHit:
     quote: str
 
 
-def _verified_skills(
-    raw: Any, description: str, counter: list[int]
-) -> list[QuotedSkill]:
+def _verified_skills(raw: Any, description: str, counter: list[int]) -> list[QuotedSkill]:
     skills: list[QuotedSkill] = []
     seen: set[str] = set()
     for item in raw or []:

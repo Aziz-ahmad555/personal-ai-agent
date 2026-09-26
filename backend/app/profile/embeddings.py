@@ -73,9 +73,7 @@ async def embed_texts(
         except Exception as exc:
             transient = isinstance(exc, _TRANSIENT_ERRORS)
             if not transient or attempt >= _MAX_RETRY_ATTEMPTS:
-                logger.warning(
-                    "embeddings_skipped_api_error", attempts=attempt, error=str(exc)
-                )
+                logger.warning("embeddings_skipped_api_error", attempts=attempt, error=str(exc))
                 return None
             delay = _RETRY_BASE_DELAY_SECONDS * (2 ** (attempt - 1))
             logger.warning(

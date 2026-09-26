@@ -1,17 +1,33 @@
+# This config lives at backend/.pre-commit-config.yaml, but pre-commit always resolves
+# file patterns relative to the actual git root (one level up, since backend/ is a
+# subdirectory of this repo, not a repo of its own) — every `files:` pattern below is
+# written with that in mind. `files: ^app/` here would silently match nothing, ever.
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.6.9
     hooks:
       - id: ruff
         args: [--fix]
+        files: ^backend/
       - id: ruff-format
+        files: ^backend/
 
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.11.2
+  # A `local`/`system` hook, not the mirrors-mypy repo hook: that one type-checks inside
+  # its own isolated virtualenv, which has none of this project's real dependencies
+  # installed (only whatever's listed in additional_dependencies) — every third-party
+  # import (fastapi, sqlalchemy, structlog, ...) came back "Cannot find implementation or
+  # library stub" the one time this was actually run. Running mypy from the project's own
+  # activated venv, where every real dependency is already installed, is what `mypy app`
+  # (README, CI) already does — this just runs the identical command as a hook instead of
+  # by hand. Needs the backend venv active in the shell `git commit` runs from.
+  - repo: local
     hooks:
       - id: mypy
-        additional_dependencies: [pydantic>=2.9]
-        files: ^app/
+        name: mypy
+        entry: mypy --config-file=backend/pyproject.toml
+        language: system
+        files: ^backend/app/
+        pass_filenames: true
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.6.0

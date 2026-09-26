@@ -390,9 +390,7 @@ async def test_list_filters_by_status_and_carries_job_and_match(
     await _move(client, auth_headers, a, "applied")
 
     everything = (await client.get("/career/applications", headers=auth_headers)).json()
-    applied = (
-        await client.get("/career/applications?status=applied", headers=auth_headers)
-    ).json()
+    applied = (await client.get("/career/applications?status=applied", headers=auth_headers)).json()
     bad = await client.get("/career/applications?status=bogus", headers=auth_headers)
 
     assert len(everything) == 2

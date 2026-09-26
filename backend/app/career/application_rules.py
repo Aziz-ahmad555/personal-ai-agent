@@ -63,8 +63,7 @@ def validate_transition(from_status: str, to_status: str) -> None:
         raise ApplicationTransitionError("An accepted application is final and can't be changed.")
     if from_status in REOPENABLE_STATUSES:
         raise ApplicationTransitionError(
-            f"A '{from_status}' application can only be reopened into: "
-            f"{', '.join(REOPEN_TARGETS)}."
+            f"A '{from_status}' application can only be reopened into: {', '.join(REOPEN_TARGETS)}."
         )
     if from_status == "saved":
         raise ApplicationTransitionError(
@@ -78,7 +77,7 @@ def validate_transition(from_status: str, to_status: str) -> None:
 
 
 def follow_up_state(next_action_on: date | None, status: str, *, today: date) -> str | None:
-    """"overdue" / "due_today" / "upcoming", or None when there's nothing to act on. A closed
+    """ "overdue" / "due_today" / "upcoming", or None when there's nothing to act on. A closed
     application never nags — its follow-up is moot."""
     if next_action_on is None or status in CLOSED_STATUSES:
         return None

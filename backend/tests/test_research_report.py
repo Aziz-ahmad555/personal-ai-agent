@@ -32,9 +32,7 @@ async def test_a_sentence_with_a_real_marker_survives_intact() -> None:
 
 
 async def test_a_sentence_with_an_unresolved_marker_is_dropped_whole_not_just_the_bracket() -> None:
-    llm = _FakeLLM(
-        {"summary": "The role pays $200k [bogus].", "uncertainties": []}
-    )
+    llm = _FakeLLM({"summary": "The role pays $200k [bogus].", "uncertainties": []})
 
     draft = await draft_report(llm, query_text="q", purpose=None, claims=[CLAIM])
 
@@ -46,9 +44,7 @@ async def test_a_sentence_with_an_unresolved_marker_is_dropped_whole_not_just_th
 async def test_a_good_sentence_survives_alongside_a_dropped_bad_one() -> None:
     llm = _FakeLLM(
         {
-            "summary": (
-                "Kubernetes is listed as preferred [c1]. The role pays $200k [bogus]."
-            ),
+            "summary": ("Kubernetes is listed as preferred [c1]. The role pays $200k [bogus]."),
             "uncertainties": [],
         }
     )
@@ -80,9 +76,7 @@ async def test_a_sentence_with_no_marker_at_all_is_left_untouched() -> None:
     """Documents a separate, harder problem this fix doesn't attempt to solve: a sentence
     with no citation whatsoever is a different failure mode than a citation that fails to
     resolve, and isn't caught here."""
-    llm = _FakeLLM(
-        {"summary": "The hiring manager is Sarah Chen.", "uncertainties": []}
-    )
+    llm = _FakeLLM({"summary": "The hiring manager is Sarah Chen.", "uncertainties": []})
 
     draft = await draft_report(llm, query_text="q", purpose=None, claims=[CLAIM])
 

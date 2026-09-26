@@ -151,9 +151,7 @@ async def _career_section(
     db: AsyncSession, user_id: uuid.UUID, start: datetime, end: datetime
 ) -> dict[str, Any]:
     all_jobs = (
-        (await db.execute(select(JobPosting).where(JobPosting.user_id == user_id)))
-        .scalars()
-        .all()
+        (await db.execute(select(JobPosting).where(JobPosting.user_id == user_id))).scalars().all()
     )
     jobs = sorted(
         (j for j in all_jobs if _in_range(j.discovered_at, start, end)),

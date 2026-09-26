@@ -167,8 +167,11 @@ async def test_verify_employer_returns_verified_for_official_source(
     async with session_factory() as db:
         user = await _make_user(db)
         job = JobPosting(
-            user_id=user.id, source_channel="manual_paste", company_name="Acme Corp",
-            company_domain=COMPANY_DOMAIN, remote_type="unknown",
+            user_id=user.id,
+            source_channel="manual_paste",
+            company_name="Acme Corp",
+            company_domain=COMPANY_DOMAIN,
+            remote_type="unknown",
         )
         db.add(job)
         await db.flush()
@@ -214,8 +217,11 @@ async def test_verify_employer_returns_unconfirmed_without_official_source(
     async with session_factory() as db:
         user = await _make_user(db)
         job = JobPosting(
-            user_id=user.id, source_channel="manual_paste", company_name="Acme Corp",
-            company_domain=COMPANY_DOMAIN, remote_type="unknown",
+            user_id=user.id,
+            source_channel="manual_paste",
+            company_name="Acme Corp",
+            company_domain=COMPANY_DOMAIN,
+            remote_type="unknown",
         )
         db.add(job)
         await db.flush()
@@ -274,8 +280,11 @@ async def test_verify_employer_returns_suspicious_on_contradiction(
     async with session_factory() as db:
         user = await _make_user(db)
         job = JobPosting(
-            user_id=user.id, source_channel="manual_paste", company_name="Acme Corp",
-            company_domain=COMPANY_DOMAIN, remote_type="unknown",
+            user_id=user.id,
+            source_channel="manual_paste",
+            company_name="Acme Corp",
+            company_domain=COMPANY_DOMAIN,
+            remote_type="unknown",
         )
         db.add(job)
         await db.flush()
@@ -314,12 +323,18 @@ async def test_verify_employer_reuses_a_fresh_cached_result(
     async with session_factory() as db:
         user = await _make_user(db)
         job_a = JobPosting(
-            user_id=user.id, source_channel="manual_paste", company_name="Acme Corp",
-            company_domain=COMPANY_DOMAIN, remote_type="unknown",
+            user_id=user.id,
+            source_channel="manual_paste",
+            company_name="Acme Corp",
+            company_domain=COMPANY_DOMAIN,
+            remote_type="unknown",
         )
         job_b = JobPosting(
-            user_id=user.id, source_channel="manual_paste", company_name="Acme Corp",
-            company_domain=COMPANY_DOMAIN, remote_type="unknown",
+            user_id=user.id,
+            source_channel="manual_paste",
+            company_name="Acme Corp",
+            company_domain=COMPANY_DOMAIN,
+            remote_type="unknown",
         )
         db.add_all([job_a, job_b])
         await db.flush()
@@ -360,15 +375,20 @@ async def test_assess_job_fraud_folds_in_unconfirmed_employer_status(
     async with session_factory() as db:
         user = await _make_user(db)
         job = JobPosting(
-            user_id=user.id, source_channel="manual_paste", company_name="Acme Corp",
-            description_text="A totally ordinary job description.", remote_type="unknown",
+            user_id=user.id,
+            source_channel="manual_paste",
+            company_name="Acme Corp",
+            description_text="A totally ordinary job description.",
+            remote_type="unknown",
         )
         db.add(job)
         await db.flush()
 
         verification = EmployerVerification(
-            employer_key="name:acme corp", company_name="Acme Corp",
-            verification_status="unconfirmed", confidence_score=0,
+            employer_key="name:acme corp",
+            company_name="Acme Corp",
+            verification_status="unconfirmed",
+            confidence_score=0,
             rationale="No sources found.",
         )
         db.add(verification)

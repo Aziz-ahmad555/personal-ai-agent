@@ -66,9 +66,7 @@ async def test_request_approval_rejects_green_risk(
     async with session_factory() as db:
         user = await _make_user(db)
         with pytest.raises(ApprovalError):
-            await request_approval(
-                db, user_id=user.id, action="x", risk_level="green", summary="s"
-            )
+            await request_approval(db, user_id=user.id, action="x", risk_level="green", summary="s")
 
 
 async def test_yellow_action_stays_pending_until_decided(

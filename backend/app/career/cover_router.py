@@ -43,9 +43,7 @@ async def _owned_job(db: AsyncSession, job_id: uuid.UUID, user_id: uuid.UUID) ->
     return job
 
 
-async def _owned_letter(
-    db: AsyncSession, letter_id: uuid.UUID, user_id: uuid.UUID
-) -> CoverLetter:
+async def _owned_letter(db: AsyncSession, letter_id: uuid.UUID, user_id: uuid.UUID) -> CoverLetter:
     letter = (
         await db.execute(
             select(CoverLetter).where(CoverLetter.id == letter_id, CoverLetter.user_id == user_id)

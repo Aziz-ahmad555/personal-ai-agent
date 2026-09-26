@@ -76,9 +76,7 @@ async def test_a_refresh_token_cannot_be_used_as_an_access_token(client: AsyncCl
 async def test_an_access_token_cannot_be_used_to_refresh(client: AsyncClient) -> None:
     tokens = await _register_and_login(client)
 
-    response = await client.post(
-        "/auth/refresh", json={"refresh_token": tokens["access_token"]}
-    )
+    response = await client.post("/auth/refresh", json={"refresh_token": tokens["access_token"]})
 
     assert response.status_code == 401
 
@@ -110,5 +108,3 @@ async def test_FINDING_a_refresh_token_is_reusable_after_being_used(client: Asyn
     # starts failing, refresh-token rotation has been added — update this test, don't just
     # relax it.
     assert second_use.status_code == 200
-
-

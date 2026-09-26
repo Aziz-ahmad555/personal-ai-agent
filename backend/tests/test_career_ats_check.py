@@ -93,9 +93,7 @@ def test_a_skill_only_in_the_skills_list_is_listed_only_and_points_at_its_roles(
 
 def test_a_skill_that_is_not_on_the_resume_is_a_gap_with_the_right_reason() -> None:
     base = _base()
-    results, _ = check_keywords(
-        render_markdown(base), [_req("Docker"), _req("Kubernetes")], base
-    )
+    results, _ = check_keywords(render_markdown(base), [_req("Docker"), _req("Kubernetes")], base)
     reasons = {r.name: r.detail for r in results}
 
     assert all(r.state == "gap" for r in results)

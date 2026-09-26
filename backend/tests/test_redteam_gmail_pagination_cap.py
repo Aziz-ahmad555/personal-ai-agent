@@ -60,9 +60,7 @@ async def test_backfill_paging_stops_at_the_cap_instead_of_looping_forever(
 
     async with session_factory() as db:
         connection = await _make_connection(db)
-        sync_run = GmailSyncRun(
-            connection_id=connection.id, sync_type="backfill", status="running"
-        )
+        sync_run = GmailSyncRun(connection_id=connection.id, sync_type="backfill", status="running")
         db.add(sync_run)
         await db.commit()
 

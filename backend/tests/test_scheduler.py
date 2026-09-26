@@ -144,10 +144,14 @@ async def test_scheduled_github_sync_skips_a_disconnected_connection(
 
     async with session_factory() as db:
         runs = (
-            await db.execute(
-                select(GithubSyncRun).where(GithubSyncRun.connection_id == connection.id)
+            (
+                await db.execute(
+                    select(GithubSyncRun).where(GithubSyncRun.connection_id == connection.id)
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
     assert runs == []
     assert fake.requests == []
 
@@ -203,8 +207,10 @@ async def test_scheduled_feed_poll_creates_postings_tagged_as_scheduled(
 
     async with session_factory() as db:
         postings = (
-            await db.execute(select(JobPosting).where(JobPosting.user_id == user.id))
-        ).scalars().all()
+            (await db.execute(select(JobPosting).where(JobPosting.user_id == user.id)))
+            .scalars()
+            .all()
+        )
         entry = (
             await db.execute(select(AuditLog).where(AuditLog.action == "career.feed.polled"))
         ).scalar_one()
@@ -250,12 +256,12 @@ async def test_a_failing_feed_does_not_stop_the_rest_of_the_scheduled_poll(
 
     async with session_factory() as db:
         postings = (
-            await db.execute(select(JobPosting).where(JobPosting.user_id == user.id))
-        ).scalars().all()
+            (await db.execute(select(JobPosting).where(JobPosting.user_id == user.id)))
+            .scalars()
+            .all()
+        )
         failed_entry = (
-            await db.execute(
-                select(AuditLog).where(AuditLog.action == "career.feed.poll_failed")
-            )
+            await db.execute(select(AuditLog).where(AuditLog.action == "career.feed.poll_failed"))
         ).scalar_one()
     assert len(postings) == 1  # the good feed still ran
     assert failed_entry.evidence["trigger"] == "scheduled"
@@ -431,9 +437,7 @@ async def test_scheduled_calendar_sync_skips_a_disconnected_connection(
 ) -> None:
     fake = FakeCalendar()
     monkeypatch.setattr(calendar_sync.httpx, "AsyncClient", fake.client_factory())
-    await _calendar_connection(
-        session_factory, status="disconnected", access_token_encrypted=None
-    )
+    await _calendar_connection(session_factory, status="disconnected", access_token_encrypted=None)
 
     await run_scheduled_calendar_syncs()
 

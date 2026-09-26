@@ -28,9 +28,7 @@ async def _seed_owned_data(
     session_factory: async_sessionmaker[AsyncSession], user_id: uuid.UUID
 ) -> None:
     async with session_factory() as db:
-        db.add(
-            JobPosting(user_id=user_id, source_channel="manual", title="Backend Engineer")
-        )
+        db.add(JobPosting(user_id=user_id, source_channel="manual", title="Backend Engineer"))
         db.add(ResearchQuery(user_id=user_id, query_text="does acme sponsor visas"))
         db.add(
             GmailConnection(
@@ -53,9 +51,7 @@ def _fake_revocations(monkeypatch: pytest.MonkeyPatch) -> dict[str, list[str]]:
         revoked[kind].append(token)
         return True
 
-    monkeypatch.setattr(
-        account_deletion.gmail_oauth, "revoke_token", lambda t: revoke("gmail", t)
-    )
+    monkeypatch.setattr(account_deletion.gmail_oauth, "revoke_token", lambda t: revoke("gmail", t))
     monkeypatch.setattr(
         account_deletion.calendar_oauth, "revoke_token", lambda t: revoke("calendar", t)
     )
@@ -110,8 +106,10 @@ async def test_declining_leaves_the_account_and_its_data_untouched(
     async with session_factory() as db:
         assert await db.get(User, user_id) is not None
         postings = (
-            await db.execute(select(JobPosting).where(JobPosting.user_id == user_id))
-        ).scalars().all()
+            (await db.execute(select(JobPosting).where(JobPosting.user_id == user_id)))
+            .scalars()
+            .all()
+        )
         assert len(postings) == 1
 
 

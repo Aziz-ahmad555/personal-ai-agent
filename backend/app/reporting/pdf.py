@@ -16,9 +16,7 @@ from app.reporting.models import WeeklyDigest
 
 _styles = getSampleStyleSheet()
 _TITLE = _styles["Title"]
-_HEADING = ParagraphStyle(
-    "DigestHeading", parent=_styles["Heading2"], spaceBefore=14, spaceAfter=6
-)
+_HEADING = ParagraphStyle("DigestHeading", parent=_styles["Heading2"], spaceBefore=14, spaceAfter=6)
 _BODY = _styles["BodyText"]
 _MUTED = ParagraphStyle("DigestMuted", parent=_styles["BodyText"], textColor=colors.grey)
 
@@ -127,9 +125,7 @@ def render_digest_pdf(digest: WeeklyDigest) -> bytes:
             f"{tally['missed']} missed, {tally['unclear']} unclear, "
             f"{tally['unanswered']} unanswered"
         )
-    _section(
-        story, "Career activity this week", career_lines, "No career activity this week."
-    )
+    _section(story, "Career activity this week", career_lines, "No career activity this week.")
 
     research = data.get("research", {})
     research_lines: list[str] = []

@@ -86,9 +86,7 @@ async def _derive_verdict(
                 select(ResearchClaim)
                 .where(ResearchClaim.query_id == query.id)
                 .options(
-                    selectinload(ResearchClaim.citations).selectinload(
-                        ResearchClaimCitation.source
-                    )
+                    selectinload(ResearchClaim.citations).selectinload(ResearchClaimCitation.source)
                 )
             )
         )
@@ -143,8 +141,7 @@ async def _derive_verdict(
         return (
             "suspicious",
             best_confidence,
-            "Research found at least one source actively contradicting this employer's "
-            "legitimacy.",
+            "Research found at least one source actively contradicting this employer's legitimacy.",
         )
 
     if has_official_source and best_confidence >= MIN_CONFIDENCE_FOR_VERIFIED:
@@ -249,9 +246,7 @@ async def assess_job_fraud(
 
     existing = (
         await db.execute(
-            select(JobFraudAssessment).where(
-                JobFraudAssessment.job_posting_id == job_posting.id
-            )
+            select(JobFraudAssessment).where(JobFraudAssessment.job_posting_id == job_posting.id)
         )
     ).scalar_one_or_none()
 

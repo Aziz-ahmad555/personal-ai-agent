@@ -212,9 +212,7 @@ def test_framing_must_contain_no_facts() -> None:
 
 
 def test_framing_may_name_the_company_and_role_it_was_given() -> None:
-    assert (
-        _reason({"text": "I am excited about Acme.", "kind": "framing", "supports": []}) is None
-    )
+    assert _reason({"text": "I am excited about Acme.", "kind": "framing", "supports": []}) is None
 
 
 def test_a_summary_can_be_cited_only_if_the_profile_has_one() -> None:

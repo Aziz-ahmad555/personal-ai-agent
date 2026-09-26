@@ -79,9 +79,7 @@ def build_prompt(
     items: list[TailorItem],
 ) -> str:
     req_lines = "\n".join(f"- {r['name']} ({r['kind']})" for r in requirements)
-    item_blocks = "\n\n".join(
-        f"[id: {item.source_id}] {item.label}\n{item.text}" for item in items
-    )
+    item_blocks = "\n\n".join(f"[id: {item.source_id}] {item.label}\n{item.text}" for item in items)
     return (
         f"Job: {job_title or 'Untitled'} at {company or 'an employer'}\n\n"
         f"Requirements from the posting:\n{wrap_untrusted('job_requirements', req_lines)}\n\n"

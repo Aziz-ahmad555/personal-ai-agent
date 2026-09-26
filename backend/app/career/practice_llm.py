@@ -67,10 +67,13 @@ def _build_questions_prompt(
 ) -> str:
     requested_raw = "\n".join(f"- {r['name']} ({r['kind']})" for r in requirements)
     requested = wrap_untrusted("job_requirements", requested_raw) if requested_raw else "(none)"
-    experiences = "\n\n".join(
-        f"[ref: exp:{e.id}] {e.title} — {e.company}\n{e.description or '(no description)'}"
-        for e in base.experiences
-    ) or "(none)"
+    experiences = (
+        "\n\n".join(
+            f"[ref: exp:{e.id}] {e.title} — {e.company}\n{e.description or '(no description)'}"
+            for e in base.experiences
+        )
+        or "(none)"
+    )
     skills = "\n".join(f"- {s.name}: {s.evidence}" for s in base.skills) or "(none)"
     return (
         f"Job: {job_title or 'Untitled'} at {company or 'an employer'}\n\n"

@@ -31,9 +31,7 @@ def test_build_authorization_url_includes_required_params() -> None:
 
 
 def test_build_authorization_url_raises_without_client_id(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(
-        oauth, "get_settings", lambda: types.SimpleNamespace(google_client_id=None)
-    )
+    monkeypatch.setattr(oauth, "get_settings", lambda: types.SimpleNamespace(google_client_id=None))
     with pytest.raises(oauth.OAuthError):
         oauth.build_authorization_url(uuid.uuid4())
 

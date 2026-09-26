@@ -198,11 +198,7 @@ def _extract_body_text(payload: dict[str, object]) -> str | None:
     parts = _walk_parts(payload)
 
     plain = next(
-        (
-            p
-            for p in parts
-            if p.get("mimeType") == "text/plain" and _part_data(p) is not None
-        ),
+        (p for p in parts if p.get("mimeType") == "text/plain" and _part_data(p) is not None),
         None,
     )
     if plain is not None:

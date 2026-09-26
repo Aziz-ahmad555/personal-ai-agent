@@ -285,8 +285,7 @@ async def test_full_flow_answers_get_verified_feedback_and_unverifiable_feedback
     assert "Python" in by_id[python_q["id"]]["feedback_text"]
     assert by_id[exp_q["id"]]["verdict"] == "unclear"
     assert (
-        by_id[exp_q["id"]]["feedback_text"]
-        == "Feedback couldn't be verified against your answer."
+        by_id[exp_q["id"]]["feedback_text"] == "Feedback couldn't be verified against your answer."
     )
     assert by_id[skill_q["id"]]["verdict"] == "missed"
     assert by_id[skill_q["id"]]["feedback_text"] == "No answer was given."
@@ -347,9 +346,7 @@ async def test_application_id_must_belong_to_the_same_job_and_user(
         await db.commit()
         mismatched_application_id = str(application.id)
 
-    response = await _start(
-        client, auth_headers, job_id, application_id=mismatched_application_id
-    )
+    response = await _start(client, auth_headers, job_id, application_id=mismatched_application_id)
     assert response.status_code == 422
     assert "isn't linked to this job" in response.json()["detail"]
 
@@ -466,9 +463,7 @@ async def test_submitting_answers_is_validated(
         f"/career/practice-sessions/{session['id']}/answers",
         headers=auth_headers,
         json={
-            "answers": [
-                {"question_id": session["questions"][0]["id"], "answer_text": "x" * 4001}
-            ]
+            "answers": [{"question_id": session["questions"][0]["id"], "answer_text": "x" * 4001}]
         },
     )
     assert too_long.status_code == 422

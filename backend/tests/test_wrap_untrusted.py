@@ -21,7 +21,7 @@ def test_wraps_content_in_a_named_tag_with_a_data_not_instructions_warning() -> 
 
 
 def test_the_wrapped_content_is_verbatim_not_escaped_or_truncated() -> None:
-    content = "Line one.\nLine two with <angle brackets> and \"quotes\"."
+    content = 'Line one.\nLine two with <angle brackets> and "quotes".'
     result = wrap_untrusted("source_excerpt", content)
 
     assert content in result

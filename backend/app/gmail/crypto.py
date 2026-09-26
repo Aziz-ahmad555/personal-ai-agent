@@ -21,7 +21,7 @@ def _get_fernet() -> Fernet:
     if not key:
         raise TokenEncryptionUnavailableError(
             "TOKEN_ENCRYPTION_KEY is not set — cannot encrypt/decrypt OAuth tokens. "
-            "Generate one with: python -c \"from cryptography.fernet import Fernet; "
+            'Generate one with: python -c "from cryptography.fernet import Fernet; '
             'print(Fernet.generate_key().decode())"'
         )
     return Fernet(key.encode())

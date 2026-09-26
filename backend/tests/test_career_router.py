@@ -34,8 +34,12 @@ async def test_create_from_url_then_list_and_get(
 ) -> None:
     async def fake_fetch_source(url: str, *, timeout_seconds: float, max_chars: int) -> FetchResult:
         return FetchResult(
-            final_url=JOB_URL, http_status=200, content=JOB_CONTENT, title="ML Engineer",
-            published_at=datetime(2026, 9, 1, tzinfo=UTC), fetch_error=None,
+            final_url=JOB_URL,
+            http_status=200,
+            content=JOB_CONTENT,
+            title="ML Engineer",
+            published_at=datetime(2026, 9, 1, tzinfo=UTC),
+            fetch_error=None,
         )
 
     llm = _FakeLLMProvider(
@@ -44,9 +48,7 @@ async def test_create_from_url_then_list_and_get(
     monkeypatch.setattr(discovery_module, "fetch_source", fake_fetch_source)
     monkeypatch.setattr(discovery_module, "get_llm_provider", lambda settings: llm)
 
-    create = await client.post(
-        "/career/jobs/from-url", headers=auth_headers, json={"url": JOB_URL}
-    )
+    create = await client.post("/career/jobs/from-url", headers=auth_headers, json={"url": JOB_URL})
     assert create.status_code == 201
     job_id = create.json()["id"]
     assert create.json()["company_name"] == "Acme Corp"
@@ -65,7 +67,11 @@ async def test_create_from_url_returns_502_on_fetch_failure(
 ) -> None:
     async def fake_fetch_source(url: str, *, timeout_seconds: float, max_chars: int) -> FetchResult:
         return FetchResult(
-            final_url=url, http_status=404, content=None, title=None, published_at=None,
+            final_url=url,
+            http_status=404,
+            content=None,
+            title=None,
+            published_at=None,
             fetch_error="http_404",
         )
 
@@ -136,9 +142,7 @@ async def test_job_from_another_user_is_not_visible(
     assert got.status_code == 404
 
 
-async def test_feed_crud_and_validation(
-    client: AsyncClient, auth_headers: dict[str, str]
-) -> None:
+async def test_feed_crud_and_validation(client: AsyncClient, auth_headers: dict[str, str]) -> None:
     invalid = await client.post(
         "/career/jobs/feeds", headers=auth_headers, json={"board": "greenhouse"}
     )
@@ -185,9 +189,7 @@ async def test_verify_endpoint_dispatches_to_verification_and_returns_202(
     ) -> None:
         calls.append((job_posting_id, user_id))
 
-    monkeypatch.setattr(
-        career_router_module, "verify_and_assess_job", fake_verify_and_assess_job
-    )
+    monkeypatch.setattr(career_router_module, "verify_and_assess_job", fake_verify_and_assess_job)
 
     response = await client.post(f"/career/jobs/{job_id}/verify", headers=auth_headers)
     assert response.status_code == 202
@@ -227,9 +229,13 @@ async def test_poll_feed_endpoint_discovers_new_postings(
     async def fake_fetch_greenhouse(client_obj: object, company_slug: str) -> list[RawPosting]:
         return [
             RawPosting(
-                external_id="42", title="Platform Engineer", location="Remote",
-                url="https://acme.example.com/jobs/42", posted_at=None,
-                description="Build platforms.", raw={},
+                external_id="42",
+                title="Platform Engineer",
+                location="Remote",
+                url="https://acme.example.com/jobs/42",
+                posted_at=None,
+                description="Build platforms.",
+                raw={},
             )
         ]
 

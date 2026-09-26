@@ -237,8 +237,10 @@ async def test_the_check_is_deterministic_and_audited(
     assert first == second
     async with session_factory() as db:
         entry = (
-            await db.execute(select(AuditLog).where(AuditLog.action == "career.ats.checked"))
-        ).scalars().first()
+            (await db.execute(select(AuditLog).where(AuditLog.action == "career.ats.checked")))
+            .scalars()
+            .first()
+        )
     assert entry is not None
     assert entry.evidence["keyword_coverage_percent"] == 33
     assert entry.evidence["resume_source"] == "profile"

@@ -130,9 +130,7 @@ async def get_job_resume(
     return await _build_detail(db, resume)
 
 
-@router.post(
-    "/resumes/{resume_id}/changes/{change_id}/decision", response_model=TailoredResumeRead
-)
+@router.post("/resumes/{resume_id}/changes/{change_id}/decision", response_model=TailoredResumeRead)
 async def decide(
     resume_id: uuid.UUID,
     change_id: uuid.UUID,

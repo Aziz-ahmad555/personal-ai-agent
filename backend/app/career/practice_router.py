@@ -153,9 +153,7 @@ async def start_practice_session(
     return {"status": "questions_started"}
 
 
-@router.get(
-    "/jobs/{job_id}/practice-sessions", response_model=list[PracticeSessionSummary]
-)
+@router.get("/jobs/{job_id}/practice-sessions", response_model=list[PracticeSessionSummary])
 async def list_job_practice_sessions(
     job_id: uuid.UUID,
     user: Annotated[User, Depends(get_current_user)],
@@ -191,9 +189,7 @@ async def get_practice_session(
     return await _build_detail(db, session)
 
 
-@router.patch(
-    "/practice-sessions/{session_id}/answers", status_code=status.HTTP_202_ACCEPTED
-)
+@router.patch("/practice-sessions/{session_id}/answers", status_code=status.HTTP_202_ACCEPTED)
 async def submit_practice_answers(
     session_id: uuid.UUID,
     body: SubmitPracticeAnswersRequest,
@@ -205,9 +201,7 @@ async def submit_practice_answers(
     questions = await practice_service.load_questions(db, session.id)
     # Also allowed as a retry when a previous feedback run failed (e.g. an LLM outage) —
     # the user's answers are already saved, so they shouldn't have to retype them.
-    can_submit = session.status == "ready_for_answers" or (
-        session.status == "failed" and questions
-    )
+    can_submit = session.status == "ready_for_answers" or (session.status == "failed" and questions)
     if not can_submit:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail="This session isn't ready for answers."

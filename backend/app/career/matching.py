@@ -413,9 +413,7 @@ def _work_mode_location_component(job: JobFacts, profile: ProfileFacts) -> Compo
         result.caveats = unverifiable
         return result
     fraction = sum(checks) / len(checks)
-    result = _assessed(
-        key, fraction, f"{len(checks)} check(s) against your preferences.", details
-    )
+    result = _assessed(key, fraction, f"{len(checks)} check(s) against your preferences.", details)
     result.caveats = unverifiable
     return result
 
@@ -442,9 +440,7 @@ def _salary_component(job: JobFacts, profile: ProfileFacts) -> ComponentResult:
     )
     if job.salary_currency and job.salary_currency.upper() != "USD":
         # Preferences hold no currency; we compare the raw numbers, and say so.
-        summary += (
-            f" (Compared without currency conversion — posting is in {job.salary_currency}.)"
-        )
+        summary += f" (Compared without currency conversion — posting is in {job.salary_currency}.)"
     return _assessed(key, fraction, summary, [detail])
 
 

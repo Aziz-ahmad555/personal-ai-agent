@@ -88,9 +88,7 @@ async def has_completed_match(db: AsyncSession, job_posting_id: uuid.UUID) -> bo
     return match is not None and match.status == "completed"
 
 
-async def get_active_session(
-    db: AsyncSession, job_posting_id: uuid.UUID
-) -> PracticeSession | None:
+async def get_active_session(db: AsyncSession, job_posting_id: uuid.UUID) -> PracticeSession | None:
     return (
         await db.execute(
             select(PracticeSession).where(
@@ -216,9 +214,7 @@ async def _compute_questions(
             shown = str(raw.get("text", "") if isinstance(raw, dict) else "")
             dropped.append({"question": shown.strip()[:240], "reason": reason or "unverified"})
             continue
-        questions.append(
-            PracticeQuestion(session_id=session.id, position=len(questions), **clean)
-        )
+        questions.append(PracticeQuestion(session_id=session.id, position=len(questions), **clean))
 
     if not questions:
         raise PracticeError(

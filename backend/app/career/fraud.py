@@ -59,7 +59,12 @@ _URGENCY_PATTERNS = [
 ]
 
 _FREE_EMAIL_DOMAINS = {
-    "gmail.com", "yahoo.com", "hotmail.com", "outlook.com", "aol.com", "icloud.com",
+    "gmail.com",
+    "yahoo.com",
+    "hotmail.com",
+    "outlook.com",
+    "aol.com",
+    "icloud.com",
 }
 _KNOWN_ATS_DOMAINS = {"greenhouse.io", "lever.co", "ashbyhq.com", "myworkdayjobs.com", "icims.com"}
 
@@ -131,8 +136,7 @@ def assess_fraud_risk(
         signals.append(
             FraudSignal(
                 "employer_unconfirmed",
-                "Employer verification found no corroborating official source for this "
-                "employer.",
+                "Employer verification found no corroborating official source for this employer.",
             )
         )
 
@@ -174,9 +178,7 @@ def assess_fraud_risk(
         )
 
     if salary_min is not None and salary_max is not None:
-        implausible = salary_min > salary_max or (
-            salary_min > 0 and salary_max > salary_min * 5
-        )
+        implausible = salary_min > salary_max or (salary_min > 0 and salary_max > salary_min * 5)
         if implausible:
             signals.append(
                 FraudSignal(

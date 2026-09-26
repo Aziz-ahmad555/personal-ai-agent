@@ -141,5 +141,8 @@ async def test_fetch_usajobs_postings_raises_on_http_error() -> None:
     client = _FakeHttpClient(_response(500, {}))
     with pytest.raises(BoardApiError):
         await fetch_usajobs_postings(
-            client, "x", api_key="k", user_agent_email="e@example.com"  # type: ignore[arg-type]
+            client,
+            "x",
+            api_key="k",
+            user_agent_email="e@example.com",  # type: ignore[arg-type]
         )

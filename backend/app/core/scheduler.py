@@ -118,11 +118,7 @@ async def run_scheduled_gmail_syncs() -> None:
     different risk profile than a human clicking a button once."""
     async with db_base.async_session_factory() as db:
         connections = (
-            (
-                await db.execute(
-                    select(GmailConnection).where(GmailConnection.status == "connected")
-                )
-            )
+            (await db.execute(select(GmailConnection).where(GmailConnection.status == "connected")))
             .scalars()
             .all()
         )

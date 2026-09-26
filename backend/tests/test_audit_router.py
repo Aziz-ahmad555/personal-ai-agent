@@ -94,9 +94,7 @@ async def test_get_log_404s_for_another_users_log(
         other = User(email=f"other-{uuid.uuid4()}@example.com", hashed_password="x")
         db.add(other)
         await db.flush()
-        log = await log_action(
-            db, user_id=other.id, action="x", risk_level="green", summary="s"
-        )
+        log = await log_action(db, user_id=other.id, action="x", risk_level="green", summary="s")
         await db.commit()
         log_id = str(log.id)
 
