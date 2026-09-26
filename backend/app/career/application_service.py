@@ -1,6 +1,16 @@
 """Application tracker operations. Green risk throughout: these are the user's own local
 records — nothing is submitted, sent, or inferred — and each change is written to the audit
-trail. The status rules themselves are plain code in app.career.application_rules."""
+trail. The status rules themselves are plain code in app.career.application_rules.
+
+Every `occurred_on` default below is deliberately date.today() — the *local* calendar
+date, not UTC's. This is the user's own personal timeline (when did I apply, when did I
+hear back), which reads naturally in the user's own day; unlike follow_up_state's overdue/
+due_today/upcoming check (app.career.application_rules, called from app.career.
+application_router and app.reporting.service), nothing here ever compares this date against
+another service's own idea of "today", so there's no UTC-vs-local consistency requirement
+to uphold. Don't reflexively convert these to UTC — see the comment in
+tests/test_career_applications.py::test_timeline_orders_by_the_date_things_happened, which
+depends on this staying local."""
 
 import uuid
 from datetime import UTC, date, datetime

@@ -14,6 +14,7 @@ validation first and giving a false pass.
 import uuid
 from datetime import UTC, date, datetime, timedelta
 
+from conftest import utc_today
 from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -113,7 +114,7 @@ async def _seed_attacker_resources(
             ApplicationEvent(
                 application_id=application.id,
                 event_type="note",
-                occurred_on=date.today(),
+                occurred_on=utc_today(),
                 body="note",
             )
         )
@@ -163,8 +164,8 @@ async def _seed_attacker_resources(
 
         digest = WeeklyDigest(
             user_id=attacker.id,
-            period_start=date.today() - timedelta(days=7),
-            period_end=date.today(),
+            period_start=utc_today() - timedelta(days=7),
+            period_end=utc_today(),
             data={},
         )
         audit_log = AuditLog(

@@ -1,5 +1,5 @@
 import uuid
-from datetime import date
+from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -44,7 +44,7 @@ def _read_fields(
     computed here (from app.career.application_rules) so the UI never re-implements them."""
     return {
         "follow_up_state": follow_up_state(
-            application.next_action_on, application.status, today=date.today()
+            application.next_action_on, application.status, today=datetime.now(UTC).date()
         ),
         "job": ApplicationJobSummary.model_validate(job) if job is not None else None,
         "match": (

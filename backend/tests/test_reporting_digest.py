@@ -5,8 +5,9 @@ signals this app already computes elsewhere (follow_up_state, profile_stamp stal
 is_stalled, needs_reauth, pending approvals/proposals)."""
 
 import uuid
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
+from conftest import utc_today
 from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -423,8 +424,8 @@ async def test_other_users_digests_are_invisible_and_delete_is_audited(
         await db.commit()
         foreign = WeeklyDigest(
             user_id=other.id,
-            period_start=date.today() - timedelta(days=7),
-            period_end=date.today(),
+            period_start=utc_today() - timedelta(days=7),
+            period_end=utc_today(),
             data={
                 "period": {},
                 "career": {},

@@ -1,5 +1,6 @@
 import os
 from collections.abc import AsyncGenerator
+from datetime import UTC, date, datetime
 
 os.environ.setdefault("APP_SECRET_KEY", "test-secret-key-not-for-production-use")
 os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///:memory:")
@@ -51,6 +52,23 @@ def _enable_sqlite_foreign_keys(dbapi_connection: object, _: object) -> None:
     silently leave every child row behind, one connection pragma away from actually proving
     the cascade real Postgres already performs."""
     dbapi_connection.execute("PRAGMA foreign_keys=ON")
+
+
+def utc_today() -> date:
+    """The UTC calendar date — use this in any test building fixture data that a date-
+    boundary check will compare against, instead of the stdlib's date.today() (the *local*
+    calendar date). The two disagree for several hours a day in any timezone that isn't
+    UTC (this machine included, UTC+5), and the app itself is consistently UTC-based for
+    every such check (app.reporting.service's digest, app.career.application_rules'
+    follow_up_state, ...) — a test built on the local date can silently test the wrong side
+    of midnight. This happened for real once already: a fixture dated "yesterday" via
+    date.today() landed on "today" by the app's own UTC reckoning, turning an intended
+    "overdue" case into "due_today" and failing test_reporting_digest.py for a few hours
+    every day, in a way that had nothing to do with whatever change was actually being
+    tested. Importable directly — `from conftest import utc_today` — since date.today()
+    is often called inline (request payloads, non-fixture helper functions), not just from
+    a test's own body where a pytest fixture could be injected."""
+    return datetime.now(UTC).date()
 
 
 async def _override_get_db() -> AsyncGenerator[AsyncSession, None]:

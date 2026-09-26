@@ -4,6 +4,7 @@ snapshot frozen at "applied", PATCH clear-vs-omit semantics, and per-user isolat
 import uuid
 from datetime import date, timedelta
 
+from conftest import utc_today
 from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -135,7 +136,7 @@ async def test_applying_records_the_users_date_and_freezes_a_snapshot(
         )
         await db.commit()
     application = await _track(client, auth_headers, job_id)
-    applied_on = (date.today() - timedelta(days=3)).isoformat()
+    applied_on = (utc_today() - timedelta(days=3)).isoformat()
 
     moved = await _move(client, auth_headers, application["id"], "applied", occurred_on=applied_on)
 
@@ -206,7 +207,7 @@ async def test_future_dates_are_rejected(
 ) -> None:
     job_id = await _make_job(session_factory)
     application = await _track(client, auth_headers, job_id)
-    future = (date.today() + timedelta(days=30)).isoformat()
+    future = (utc_today() + timedelta(days=30)).isoformat()
 
     response = await _move(client, auth_headers, application["id"], "applied", occurred_on=future)
 
@@ -262,6 +263,12 @@ async def test_timeline_orders_by_the_date_things_happened(
 ) -> None:
     job_id = await _make_job(session_factory)
     app_id = (await _track(client, auth_headers, job_id))["id"]
+    # Local date.today(), not utc_today(): must land on the same calendar day as the
+    # "saved" event _track's own POST auto-creates, which app.career.application_service
+    # also dates with local date.today() (deliberate there — a personal timeline reads
+    # naturally in the user's own day, not UTC's) — using utc_today() here instead would
+    # desync from it for several hours a day and turn this same-day tie-break into a test
+    # of a different day entirely.
     today = date.today()
     # Logged later than it happened: the earlier date must sort first.
     await client.post(
@@ -319,7 +326,7 @@ async def test_follow_up_states_and_patch_clear_versus_omit(
     app_id = (await _track(client, auth_headers, job_id))["id"]
     await _move(client, auth_headers, app_id, "applied")
     url = f"/career/applications/{app_id}"
-    today = date.today()
+    today = utc_today()
 
     overdue = await client.patch(
         url,
@@ -359,7 +366,7 @@ async def test_closed_application_stops_nagging(
     await client.patch(
         f"/career/applications/{app_id}",
         headers=auth_headers,
-        json={"next_action_on": (date.today() - timedelta(days=9)).isoformat()},
+        json={"next_action_on": (utc_today() - timedelta(days=9)).isoformat()},
     )
 
     closed = await _move(client, auth_headers, app_id, "rejected")
@@ -453,7 +460,7 @@ async def test_logging_an_application_after_the_fact_keeps_the_timeline_in_order
 ) -> None:
     job_id = await _make_job(session_factory)
     app_id = (await _track(client, auth_headers, job_id))["id"]
-    applied_on = (date.today() - timedelta(days=4)).isoformat()
+    applied_on = (utc_today() - timedelta(days=4)).isoformat()
 
     body = (await _move(client, auth_headers, app_id, "applied", occurred_on=applied_on)).json()
 
@@ -472,8 +479,8 @@ async def test_a_status_date_before_the_previous_status_change_is_rejected(
 ) -> None:
     job_id = await _make_job(session_factory)
     app_id = (await _track(client, auth_headers, job_id))["id"]
-    await _move(client, auth_headers, app_id, "applied", occurred_on=date.today().isoformat())
-    too_early = (date.today() - timedelta(days=10)).isoformat()
+    await _move(client, auth_headers, app_id, "applied", occurred_on=utc_today().isoformat())
+    too_early = (utc_today() - timedelta(days=10)).isoformat()
 
     response = await _move(client, auth_headers, app_id, "screening", occurred_on=too_early)
 
