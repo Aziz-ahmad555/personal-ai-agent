@@ -5,7 +5,7 @@ what it can't back — but the prompt says the same, so most of it survives."""
 from typing import Any
 
 from app.career.resume_base import ResumeBase
-from app.research.llm import LLMProvider
+from app.research.llm import LLMProvider, wrap_untrusted
 
 SYSTEM_PROMPT = """You draft a cover letter for a job seeker. Every factual statement must be
 supported by the resume items or posting excerpts you are given, and each sentence must cite
@@ -95,7 +95,7 @@ def build_prompt(
     summary = base.summary or "(none)"
     return (
         f"Job: {job_title or 'Untitled'} at {company or 'an employer'}\n\n"
-        f"Posting text:\n{posting_text}\n\n"
+        f"Posting text:\n{wrap_untrusted('job_posting', posting_text)}\n\n"
         f"Requirements the posting states:\n{requested}\n\n"
         f"Do not mention (the candidate has no recorded evidence for these): {banned}\n\n"
         f"Candidate's name: {base.name or '(not given — do not invent one)'}\n\n"

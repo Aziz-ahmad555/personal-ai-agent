@@ -13,7 +13,7 @@ app.career.matching, in plain code.
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
-from app.research.llm import LLMProvider
+from app.research.llm import LLMProvider, wrap_untrusted
 from app.research.verify import verify_citation_excerpt
 
 EDUCATION_LEVELS = ("high_school", "associate", "bachelor", "master", "doctorate")
@@ -164,7 +164,7 @@ def _verified_skills(
 async def extract_requirements(provider: LLMProvider, *, description: str) -> JobRequirements:
     payload = await provider.generate_structured(
         system=SYSTEM_PROMPT,
-        user_message=f"Job posting text:\n\n{description}",
+        user_message=f"Job posting text:\n\n{wrap_untrusted('job_posting', description)}",
         schema_name=SCHEMA_NAME,
         schema_description=SCHEMA_DESCRIPTION,
         json_schema=REQUIREMENTS_SCHEMA,
@@ -222,7 +222,8 @@ async def check_deal_breakers(
     payload = await provider.generate_structured(
         system=DEAL_BREAKER_SYSTEM_PROMPT,
         user_message=(
-            f"Candidate's deal-breakers:\n{deal_breakers}\n\nJob posting text:\n\n{description}"
+            f"Candidate's deal-breakers:\n{deal_breakers}\n\nJob posting text:\n\n"
+            f"{wrap_untrusted('job_posting', description)}"
         ),
         schema_name=DEAL_BREAKER_SCHEMA_NAME,
         schema_description=DEAL_BREAKER_SCHEMA_DESCRIPTION,

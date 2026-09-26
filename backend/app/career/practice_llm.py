@@ -7,7 +7,7 @@ feedback item, the same discipline app.career.cover_verify applies to cover-lett
 from typing import Any
 
 from app.career.resume_base import ResumeBase
-from app.research.llm import LLMProvider
+from app.research.llm import LLMProvider, wrap_untrusted
 
 QUESTIONS_SYSTEM_PROMPT = """You write interview-practice questions for a job seeker, grounded
 only in what you're given. Rules:
@@ -65,7 +65,8 @@ def _build_questions_prompt(
     requirements: list[dict[str, Any]],
     base: ResumeBase,
 ) -> str:
-    requested = "\n".join(f"- {r['name']} ({r['kind']})" for r in requirements) or "(none)"
+    requested_raw = "\n".join(f"- {r['name']} ({r['kind']})" for r in requirements)
+    requested = wrap_untrusted("job_requirements", requested_raw) if requested_raw else "(none)"
     experiences = "\n\n".join(
         f"[ref: exp:{e.id}] {e.title} — {e.company}\n{e.description or '(no description)'}"
         for e in base.experiences
@@ -144,10 +145,15 @@ FEEDBACK_SCHEMA = {
 def _build_feedback_prompt(items: list[dict[str, Any]]) -> str:
     blocks = []
     for item in items:
+        # Only a posting_requirement's excerpt came from attacker-controlled text; a
+        # profile_experience/profile_skill excerpt is the user's own data, already trusted.
+        excerpt = item["ref_excerpt"]
+        if item["ref_type"] == "posting_requirement":
+            excerpt = wrap_untrusted("job_posting_excerpt", excerpt)
         blocks.append(
             f"[question_id: {item['id']}]\n"
             f"Question: {item['text']}\n"
-            f"Grounded in ({item['ref_type']}): {item['ref_excerpt']}\n"
+            f"Grounded in ({item['ref_type']}): {excerpt}\n"
             f"Candidate's answer: {item['answer_text']}"
         )
     return "\n\n".join(blocks)

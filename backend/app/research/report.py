@@ -14,7 +14,7 @@ import re
 from dataclasses import dataclass
 
 from app.logging import get_logger
-from app.research.llm import LLMProvider
+from app.research.llm import LLMProvider, wrap_untrusted
 
 logger = get_logger(__name__)
 
@@ -81,12 +81,15 @@ def _build_user_message(query_text: str, purpose: str | None, claims: list[Claim
     parts = [f"Research question: {query_text}"]
     if purpose:
         parts.append(f"Context/purpose: {purpose}")
-    parts.append("\nClaims:")
-    for claim in claims:
-        parts.append(
-            f"- id={claim.id} status={claim.status} confidence={claim.confidence_score}: "
-            f"{claim.claim_text}"
-        )
+    claim_lines = [
+        f"- id={claim.id} status={claim.status} confidence={claim.confidence_score}: "
+        f"{claim.claim_text}"
+        for claim in claims
+    ]
+    # Each claim already went through verify_citation_excerpt against its source, but the
+    # claim_text itself is still ultimately sourced from external web content — wrapped for
+    # the same reason as extraction.py's source excerpts.
+    parts.append("\nClaims:\n" + wrap_untrusted("verified_claims", "\n".join(claim_lines)))
     return "\n".join(parts)
 
 

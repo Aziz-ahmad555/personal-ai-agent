@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from app.logging import get_logger
-from app.research.llm import LLMProvider
+from app.research.llm import LLMProvider, wrap_untrusted
 
 logger = get_logger(__name__)
 
@@ -132,10 +132,11 @@ def _build_user_message(query_text: str, purpose: str | None, sources: list[Sour
         parts.append(f"Context/purpose: {purpose}")
     parts.append("\nSources:")
     for source in sources:
-        parts.append(
-            f"\n---\nsource_id: {source.id}\ndomain: {source.domain}\ntier: {source.tier}\n"
-            f"title: {source.title or '(untitled)'}\ntext:\n{source.content}"
+        header = (
+            f"source_id: {source.id}\ndomain: {source.domain}\ntier: {source.tier}\n"
+            f"title: {source.title or '(untitled)'}"
         )
+        parts.append(f"\n---\n{header}\n{wrap_untrusted('source_excerpt', source.content)}")
     return "\n".join(parts)
 
 

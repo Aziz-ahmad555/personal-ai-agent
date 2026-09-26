@@ -9,7 +9,7 @@ says the same thing, so most proposals are usable rather than discarded.
 from dataclasses import dataclass
 from typing import Any
 
-from app.research.llm import LLMProvider
+from app.research.llm import LLMProvider, wrap_untrusted
 
 SYSTEM_PROMPT = """You help a job seeker tailor their EXISTING resume text to one job posting.
 You are an editor, not an author. Hard rules:
@@ -84,7 +84,7 @@ def build_prompt(
     )
     return (
         f"Job: {job_title or 'Untitled'} at {company or 'an employer'}\n\n"
-        f"Requirements from the posting:\n{req_lines}\n\n"
+        f"Requirements from the posting:\n{wrap_untrusted('job_requirements', req_lines)}\n\n"
         f"Resume items you may reword:\n\n{item_blocks}"
     )
 
