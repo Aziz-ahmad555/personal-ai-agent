@@ -1,6 +1,12 @@
 # Personal AI Agent
 
+[![CI](https://github.com/Aziz-ahmad555/personal-ai-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/Aziz-ahmad555/personal-ai-agent/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)
+
 A personal, single-user agent that researches, verifies, and prepares — a human always approves before anything executes. See [CLAUDE.md](CLAUDE.md) for the full philosophy, build order, and standards this project is held to.
+
+**Backend test coverage:** 83% (measured 2026-09-26 via `pytest --cov=app`, full suite — not auto-updated here; CI computes and prints the current number on every run, in the job summary).
 
 **Phase 1: Foundation**, **Phase 2: Personal Profile Engine**, **Phase 3: Research Engine**, **Phase 4: Semantic Search** ("Ask your agent"), and **Phase 5: Gmail integration — read-only stage** are done. **Phase 6: Career Intelligence** is done — job discovery, employer verification + fraud/scam detection, weighted match scoring, the application tracker, resume tailoring (reviewable diff), fact-checked cover letters, and the ATS compatibility checker. **Phase 7: LinkedIn/GitHub/Fiverr/Indeed** is done for what's buildable: GitHub is fully integrated (connection, repo import as skill evidence, and a recruiter-readiness review, all read-only; see below), and LinkedIn, Indeed and Fiverr are marked explicitly **unavailable** on `/integrations` — no authorized API access exists for a personal developer account, and scraping isn't an authorized channel. **Phase 8: Calendar + Interview Agent** is in progress — sub-step 1 (Calendar connection, read-only; see below) is done; reading events, interview/deadline detection, and the interview practice mode are not built yet.
 
@@ -70,7 +76,7 @@ Also fixed while building it: the API client now refreshes the 30-minute access 
 ### Phase 6, sub-step 3: Career Intelligence — weighted match scoring
 `POST /career/jobs/{id}/match` (background task; the `/career` page polls) answers "how well does this job fit me?" as a percentage where every point traces to evidence. An LLM reads the posting into structured requirements (required/preferred skills, minimum years, education, industry), each with a **verbatim quote** that plain code re-checks against the posting text — a requirement whose quote can't be found is dropped, never scored (the same guardrail as Phase 3's citations). Everything after that is deterministic code (`app/career/matching.py`), no LLM: required skills 35, years of experience 20, preferred skills 10, work mode/location 10, salary 10, industry 10, education 5. Skills match exactly or by alias; an embedding-similar skill counts for labeled half credit (`FUZZY_SIMILARITY_THRESHOLD` is an uncalibrated starting default, worth tuning against real postings). Only skills with recorded evidence count.
 A component the posting or profile can't speak to (salary not published, no work history on file, ...) is **not assessed**: left out of the denominator and listed under "what this doesn't know" — never scored 0 or guessed. `assessed_weight` records how many of the 100 points were measurable; under 55 the match is flagged `low_confidence`, and the UI shows a prominent "Low confidence — most components unknown" warning ahead of the number (relabeled "of what could be measured"). With nothing measurable there's no score at all ("Can't score"), not 0%. Free-text deal-breakers are checked against the posting and reported only with a verified quote; if that check fails it's shown as "not checked", never as clear. Each match stores a hash of the profile it was computed from, so a later profile edit marks it stale. Employer-verification and fraud results are shown right next to the score — a high-fraud posting is called out so a good fit on paper can't reassure. Green risk, audit-logged (`career.job.matched`).
-The `/career` page also covers adding postings (paste or URL), the employer/fraud check, and job-board feed management. 
+The `/career` page also covers adding postings (paste or URL), the employer/fraud check, and job-board feed management.
 
 ### Phase 6, sub-step 2: Career Intelligence — employer verification + fraud/scam detection
 
@@ -124,6 +130,12 @@ This is a single-user, self-hosted agent: everything it stores lives in **your o
 - **Per integration**: each of Gmail/Calendar/GitHub's own `/connection` DELETE endpoint disconnects and revokes the grant at the provider (Google/GitHub), with an explicit choice to also purge that integration's synced data — never a silent default either way.
 - **Everything, for real**: `POST /auth/delete-account/request` returns a live evidence snapshot (real row counts, real connection statuses) as a pending red-risk approval; `POST /auth/delete-account/{id}/decide` with `{"approved": true}` is your second, explicit confirmation — it re-verifies that snapshot against the database at that exact moment (refusing if anything's changed since the request, rather than deleting against stale evidence), then revokes every connected integration at its provider and deletes every row this account owns, all in the same call. This is a genuine full-account wipe (`app/auth/account_deletion.py`), not a per-integration purge repeated three times. One honest tradeoff: the account's own audit-log rows are themselves owned by the account, so they're deleted along with everything else — the one thing that outlives a completed deletion is a structured log line written just before it, in the app's own log output, outside Postgres entirely.
 
+## CI
+
+`.github/workflows/ci.yml` runs on every push and PR, two independent jobs: **backend** (`ruff check`, `ruff format --check`, `mypy app` strict, `pytest --cov=app` — the coverage number lands in the run's own job summary) and **frontend** (`oxlint`, `tsc -b`, `vitest run`, `npm run build`). Both must pass; neither touches a real database, Redis, or any external API — the backend suite runs entirely against in-memory SQLite (see `tests/conftest.py`), the frontend suite mocks every network call.
+
+`.github/workflows/evals.yml` is `workflow_dispatch`-only — it never runs on push, since a `--live` run makes real Tavily/LLM calls (real cost). It spins up its own throwaway Postgres+pgvector service container for the retrieval bucket; `--live` additionally needs `TAVILY_API_KEY`/`VOYAGE_API_KEY`/`GROQ_API_KEY`/etc. added as repository secrets (Settings → Secrets and variables → Actions) — without them it still runs everything else in `--replay` mode for free.
+
 ## Stack
 
 - **Backend**: FastAPI (async), Pydantic v2, SQLAlchemy 2.0 (async) + Alembic, PostgreSQL + pgvector, Redis, structlog, JWT auth via OAuth2 password flow, Voyage AI for embeddings, LangGraph for the Research Engine pipeline, Tavily for search, Gemini/Anthropic for claim extraction and report drafting, Gmail API (read-only) via a hand-rolled async OAuth2 client.
@@ -176,18 +188,27 @@ Settings always load `.env` from the repo root regardless of your working direct
 
 **Gmail (requires keys to connect):** create an OAuth 2.0 Client ID at https://console.cloud.google.com/apis/credentials, add `http://localhost:8000/gmail/oauth/callback` under Authorized redirect URIs, add your own Google account as a test user on the OAuth consent screen (keep it in "Testing" status), and set `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` plus a generated `TOKEN_ENCRYPTION_KEY` in `.env` — see `.env.example` for the exact command. Testing-status refresh tokens expire every 7 days; reconnect from `/gmail` when the status shows "Needs reconnect".
 
-Run tests:
+Run tests (add `--cov=app --cov-report=term` for a coverage report, same as CI):
 
 ```bash
 pytest
 ```
 
-Lint / type-check:
+Lint / type-check / format:
 
 ```bash
 ruff check .
+ruff format --check .
 mypy app
 ```
+
+**Pre-commit hooks** (`backend/.pre-commit-config.yaml` — ruff, ruff-format, mypy, trailing-whitespace, and friends): the config ships in the repo, but installing the actual git hook is a one-time local step `pip install -e ".[dev]"` doesn't do for you:
+
+```bash
+pre-commit install
+```
+
+Run once per clone, from `backend/`. After that, every `git commit` runs these checks on the changed files automatically; CI (`.github/workflows/ci.yml`) runs the same checks again on every push as the actual gate, so a skipped or bypassed local hook still can't reach `main` unnoticed.
 
 ## 3. Frontend
 
