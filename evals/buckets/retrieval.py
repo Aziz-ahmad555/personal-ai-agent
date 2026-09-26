@@ -14,6 +14,8 @@ import uuid
 from datetime import date
 from typing import Any
 
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
 from app.db.models import User
 from app.profile.models import (
     Education,
@@ -32,8 +34,6 @@ from app.research.models import (
     ResearchSource,
 )
 from app.search import service as search_service
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
-
 from evals.config import DATASETS_DIR
 from evals.report import BucketReport, TaskResult
 
@@ -84,7 +84,12 @@ async def _seed(db: AsyncSession, corpus: list[dict[str, Any]]) -> tuple[uuid.UU
         await db.flush()
         owner_ids["education"] = edu.id
 
-    for key, skill_name in (("skill_python", "Python"), ("skill_postgres", "PostgreSQL"), ("skill_kubernetes", "Kubernetes")):
+    skill_keys = (
+        ("skill_python", "Python"),
+        ("skill_postgres", "PostgreSQL"),
+        ("skill_kubernetes", "Kubernetes"),
+    )
+    for key, skill_name in skill_keys:
         if key not in by_key:
             continue
         skill = Skill(profile_id=profile.id, name=skill_name)
@@ -109,6 +114,7 @@ async def _seed(db: AsyncSession, corpus: list[dict[str, Any]]) -> tuple[uuid.UU
             claim_text=by_key[key]["text"],
             status="single_source",
             confidence_score=60,
+            confidence_rationale="Eval fixture claim, seeded directly, not via scoring.py.",
         )
         db.add(claim)
         await db.flush()
@@ -129,9 +135,10 @@ async def _seed(db: AsyncSession, corpus: list[dict[str, Any]]) -> tuple[uuid.UU
         db.add(ResearchQuerySource(query_id=query.id, source_id=source.id, search_rank=1))
         owner_ids["source_nimbus_posting"] = source.id
 
+    research_owner_types = {"claim", "source_chunk"}
     for item in corpus:
-        embedding_row_cls = ProfileEmbedding if item["owner_type"] != "claim" and item["owner_type"] != "source_chunk" else ResearchEmbedding
-        if embedding_row_cls is ProfileEmbedding:
+        is_profile_owned = item["owner_type"] not in research_owner_types
+        if is_profile_owned:
             db.add(
                 ProfileEmbedding(
                     profile_id=profile.id,
