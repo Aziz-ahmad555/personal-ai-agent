@@ -28,6 +28,9 @@ frontend/test-results/
 # --- IDE / OS ---
 .vscode/
 .idea/
+
+# --- Eval harness ---
+evals/reports/
 .DS_Store
 Thumbs.db
 

@@ -1,0 +1,146 @@
+{
+  "description": "Hand-labeled gold set for calibrating evals/judge.py's LLM-judge. Labels (expected_faithful, expected_relevant) were assigned by reading each summary against its claims directly, before ever running the judge against them — see evals/judge.py's judge_calibration().",
+  "examples": [
+    {
+      "id": "faithful_relevant_basic",
+      "query_text": "Does this Senior Backend Engineer role at Nimbus Data require Kubernetes experience?",
+      "claims": [
+        {"id": "c1", "text": "The posting states Kubernetes experience is preferred, not required."}
+      ],
+      "summary": "Kubernetes experience is listed as preferred rather than required for this role [c1].",
+      "expected_faithful": true,
+      "expected_relevant": true
+    },
+    {
+      "id": "faithful_relevant_hedged_insufficient_data",
+      "query_text": "What is the salary range for this role?",
+      "claims": [
+        {"id": "c1", "text": "The posting does not mention a salary figure anywhere in its text."}
+      ],
+      "summary": "The posting does not publish a salary range [c1]. This isn't something the available sources cover.",
+      "expected_faithful": true,
+      "expected_relevant": true
+    },
+    {
+      "id": "unfaithful_relevant_invented_number",
+      "query_text": "What is the salary range for this role?",
+      "claims": [
+        {"id": "c1", "text": "The posting does not mention a salary figure anywhere in its text."}
+      ],
+      "summary": "The role pays between $150,000 and $180,000 per year.",
+      "expected_faithful": false,
+      "expected_relevant": true
+    },
+    {
+      "id": "unfaithful_relevant_overstated_contradiction",
+      "query_text": "Is this employer's remote policy fully remote?",
+      "claims": [
+        {"id": "c1", "text": "The careers page says the role is fully remote.", "status": "single_source"},
+        {"id": "c2", "text": "A Glassdoor review from 2026 says the team was told to return to office three days a week.", "status": "contradicted"}
+      ],
+      "summary": "This role is fully remote, with no in-office requirement [c1].",
+      "expected_faithful": false,
+      "expected_relevant": true
+    },
+    {
+      "id": "faithful_relevant_honest_contradiction",
+      "query_text": "Is this employer's remote policy fully remote?",
+      "claims": [
+        {"id": "c1", "text": "The careers page says the role is fully remote.", "status": "single_source"},
+        {"id": "c2", "text": "A Glassdoor review from 2026 says the team was told to return to office three days a week.", "status": "contradicted"}
+      ],
+      "summary": "Sources disagree here: the official posting says fully remote [c1], but a recent employee review describes a hybrid, three-day-in-office expectation [c2]. Worth confirming directly before assuming full remote.",
+      "expected_faithful": true,
+      "expected_relevant": true
+    },
+    {
+      "id": "faithful_irrelevant_wrong_question",
+      "query_text": "What is the salary range for this role?",
+      "claims": [
+        {"id": "c1", "text": "The office is located in downtown Austin, two blocks from the train station."}
+      ],
+      "summary": "The office is located in downtown Austin, close to the train station [c1].",
+      "expected_faithful": true,
+      "expected_relevant": false
+    },
+    {
+      "id": "unfaithful_irrelevant_both_wrong",
+      "query_text": "What is the salary range for this role?",
+      "claims": [
+        {"id": "c1", "text": "The office is located in downtown Austin, two blocks from the train station."}
+      ],
+      "summary": "The company was founded in 2014 by two Stanford graduates and has raised $40M in funding.",
+      "expected_faithful": false,
+      "expected_relevant": false
+    },
+    {
+      "id": "unfaithful_relevant_overstates_hedged_single_source",
+      "query_text": "Does this employer have a good reputation for engineering culture?",
+      "claims": [
+        {"id": "c1", "text": "One anonymous forum post from 2025 said the engineering team 'seemed pretty chill'.", "status": "single_source"}
+      ],
+      "summary": "This employer is well known for having an excellent engineering culture [c1].",
+      "expected_faithful": false,
+      "expected_relevant": true
+    },
+    {
+      "id": "faithful_relevant_no_claims_fallback",
+      "query_text": "Has this company had any recent layoffs?",
+      "claims": [],
+      "summary": "No verified claims were found for this query.",
+      "expected_faithful": true,
+      "expected_relevant": true
+    },
+    {
+      "id": "unfaithful_relevant_invented_named_detail",
+      "query_text": "Who is the hiring manager for this role?",
+      "claims": [
+        {"id": "c1", "text": "The posting does not name a specific hiring manager or point of contact."}
+      ],
+      "summary": "The hiring manager for this role is Sarah Chen, Director of Engineering.",
+      "expected_faithful": false,
+      "expected_relevant": true
+    },
+    {
+      "id": "faithful_relevant_combines_two_claims",
+      "query_text": "What does this role require in terms of experience?",
+      "claims": [
+        {"id": "c1", "text": "The posting requires 5+ years of backend engineering experience."},
+        {"id": "c2", "text": "The posting requires proficiency in Python and PostgreSQL."}
+      ],
+      "summary": "This role requires 5+ years of backend engineering experience [c1], with proficiency in Python and PostgreSQL specifically [c2].",
+      "expected_faithful": true,
+      "expected_relevant": true
+    },
+    {
+      "id": "unfaithful_relevant_stripped_marker_residue",
+      "query_text": "What is the team size for this role?",
+      "claims": [
+        {"id": "c1", "text": "The posting mentions the candidate would report to the Head of Platform."}
+      ],
+      "summary": "The team currently has 12 engineers and is expected to double by next year.",
+      "expected_faithful": false,
+      "expected_relevant": true
+    },
+    {
+      "id": "faithful_relevant_uncertainty_carried_honestly",
+      "query_text": "Does this role offer visa sponsorship?",
+      "claims": [
+        {"id": "c1", "text": "The posting does not mention visa sponsorship one way or the other.", "status": "unverified"}
+      ],
+      "summary": "Visa sponsorship isn't mentioned in the posting either way [c1] — worth asking directly rather than assuming.",
+      "expected_faithful": true,
+      "expected_relevant": true
+    },
+    {
+      "id": "faithful_irrelevant_answers_adjacent_question",
+      "query_text": "How many rounds of interviews does this company typically run?",
+      "claims": [
+        {"id": "c1", "text": "The posting lists required skills as Python, PyTorch, and computer vision."}
+      ],
+      "summary": "This role requires Python, PyTorch, and computer vision experience [c1].",
+      "expected_faithful": true,
+      "expected_relevant": false
+    }
+  ]
+}

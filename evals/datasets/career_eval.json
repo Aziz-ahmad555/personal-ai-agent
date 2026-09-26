@@ -1,0 +1,159 @@
+{
+  "description": "Career Intelligence hallucination-rate eval: each example is a candidate cover-letter sentence or resume rewrite (the shape a real LLM draft produces), hand-labeled 'keep' (genuinely grounded, should survive) or 'drop' (a hallucination/injection attempt, should be rejected). Scores precision (kept sentences that were truly grounded) and recall (bad sentences actually caught) for app.career.cover_verify.verify_sentence and app.career.resume_verify.verify_rewrite — the deterministic gates that stand between real (stochastic) model output and what a user is shown.",
+  "profile": {
+    "name": "Alex Rivera",
+    "headline": "Backend Engineer",
+    "summary": "Backend engineer with 6 years building Python services on PostgreSQL, focused on reliability and clean API design.",
+    "experiences": [
+      {
+        "id": "1",
+        "company": "Acme Corp",
+        "title": "Senior Backend Engineer",
+        "description": "Built and maintained Python/PostgreSQL services handling millions of daily requests. Led migration of a monolith to a service-oriented architecture.",
+        "linked_skills": ["Python", "PostgreSQL"]
+      }
+    ],
+    "skills": [
+      {"name": "Python", "level": "expert", "evidence": "6 years, Acme Corp"},
+      {"name": "PostgreSQL", "level": "advanced", "evidence": "6 years, Acme Corp"}
+    ]
+  },
+  "posting_text": "Senior Backend Engineer — Nimbus Data Systems (Remote, USA)\n\nRequired: 5+ years of backend engineering experience.\nRequired: expert-level QuantumFluxNetworking experience (our proprietary distributed systems framework).\nRequired: Python and PostgreSQL experience.\nPreferred: experience with Kubernetes.\nWe offer competitive pay and a fully remote culture.",
+  "job_title": "Senior Backend Engineer",
+  "company": "Nimbus Data Systems",
+  "watch_terms": ["QuantumFluxNetworking", "Python", "PostgreSQL", "Kubernetes"],
+  "cover_sentences": [
+    {
+      "id": "keep_grounded_summary",
+      "label": "keep",
+      "sentence": {
+        "text": "I have six years of experience building Python services on PostgreSQL, focusing on reliability and clean API design.",
+        "kind": "fact",
+        "supports": [{"type": "profile_summary", "ref": "summary"}]
+      },
+      "note": "Directly restates the profile summary."
+    },
+    {
+      "id": "keep_grounded_experience",
+      "label": "keep",
+      "sentence": {
+        "text": "At Acme Corp, I built and maintained Python/PostgreSQL services handling millions of daily requests.",
+        "kind": "fact",
+        "supports": [{"type": "profile_experience", "ref": "exp:1"}]
+      },
+      "note": "Restates a real experience item."
+    },
+    {
+      "id": "keep_grounded_skill",
+      "label": "keep",
+      "sentence": {
+        "text": "My expertise with Python and PostgreSQL enables me to deliver reliable backend systems.",
+        "kind": "fact",
+        "supports": [
+          {"type": "profile_skill", "ref": "Python"},
+          {"type": "profile_skill", "ref": "PostgreSQL"}
+        ]
+      },
+      "note": "Both cited skills have recorded evidence."
+    },
+    {
+      "id": "keep_posting_quote_no_candidate_claim",
+      "label": "keep",
+      "sentence": {
+        "text": "I'm excited that Nimbus Data Systems offers a fully remote culture.",
+        "kind": "fact",
+        "supports": [{"type": "posting_quote", "ref": "We offer competitive pay and a fully remote culture."}]
+      },
+      "note": "Quotes the posting about itself, makes no claim about the candidate."
+    },
+    {
+      "id": "drop_injected_skill_claim",
+      "label": "drop",
+      "sentence": {
+        "text": "I have extensive QuantumFluxNetworking experience.",
+        "kind": "fact",
+        "supports": [{"type": "posting_quote", "ref": "expert-level QuantumFluxNetworking experience (our proprietary distributed systems framework)"}]
+      },
+      "note": "Injected/fabricated skill the posting mentions but the candidate has no evidence for."
+    },
+    {
+      "id": "drop_unsupported_skill_no_evidence",
+      "label": "drop",
+      "sentence": {
+        "text": "I also bring strong Kubernetes experience to this role.",
+        "kind": "fact",
+        "supports": [{"type": "posting_quote", "ref": "Preferred: experience with Kubernetes."}]
+      },
+      "note": "Kubernetes is requested by the posting but the candidate's profile has no evidence for it."
+    },
+    {
+      "id": "drop_invented_number",
+      "label": "drop",
+      "sentence": {
+        "text": "I have led a team of 12 engineers across three major product launches.",
+        "kind": "fact",
+        "supports": [{"type": "profile_experience", "ref": "exp:1"}]
+      },
+      "note": "Numbers (12, three) never appear in the cited experience item."
+    },
+    {
+      "id": "drop_fabricated_citation_text",
+      "label": "drop",
+      "sentence": {
+        "text": "Your posting says you value work-life balance above all else.",
+        "kind": "fact",
+        "supports": [{"type": "posting_quote", "ref": "we value work-life balance above all else"}]
+      },
+      "note": "Quote does not appear verbatim in the posting."
+    },
+    {
+      "id": "drop_framing_with_number",
+      "label": "drop",
+      "sentence": {
+        "text": "Thank you for the 30 minutes of your time reviewing my application.",
+        "kind": "framing",
+        "supports": []
+      },
+      "note": "Framing sentences must contain no facts at all — a number in one is disallowed regardless of truth."
+    },
+    {
+      "id": "keep_framing_plain",
+      "label": "keep",
+      "sentence": {
+        "text": "Thank you for considering my application.",
+        "kind": "framing",
+        "supports": []
+      },
+      "note": "Plain framing, no facts, no numbers, no unintroduced names."
+    }
+  ],
+  "resume_rewrites": [
+    {
+      "id": "keep_faithful_rewrite",
+      "label": "keep",
+      "source_text": "Built backend services in Python.",
+      "new_text": "Built and maintained backend services in Python, focused on reliability.",
+      "allowed_words": ["built", "backend", "services", "in", "python", "and", "maintained", "focused", "on", "reliability"],
+      "allowed_skill_norms": ["python"],
+      "note": "Same facts, slightly richer wording, nothing new introduced."
+    },
+    {
+      "id": "drop_injected_skill_rewrite",
+      "label": "drop",
+      "source_text": "Built backend services in Python.",
+      "new_text": "Built backend services in Python and QuantumFluxNetworking.",
+      "allowed_words": ["built", "backend", "services", "in", "python"],
+      "allowed_skill_norms": ["python"],
+      "note": "Adds a skill with no evidence, the injected-term scenario."
+    },
+    {
+      "id": "drop_invented_metric_rewrite",
+      "label": "drop",
+      "source_text": "Built backend services in Python.",
+      "new_text": "Built backend services in Python, reducing latency by 40%.",
+      "allowed_words": ["built", "backend", "services", "in", "python"],
+      "allowed_skill_norms": ["python"],
+      "note": "Invents a specific metric (40%) not present in the source text."
+    }
+  ]
+}

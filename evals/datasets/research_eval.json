@@ -1,0 +1,53 @@
+{
+  "description": "Research Engine pipeline_examples run through the REAL app.research.report.draft_report against a FakeLLM (canned raw model output), then check the code's own marker-stripping behavior deterministically — this is what replay mode scores, with no judge call needed, since it's a check of app code, not of a model's language. The separate judge/faithfulness scoring (live mode only) reuses evals/datasets/research_judge_gold.json's hand-labeled examples directly rather than building a second, overlapping dataset.",
+  "pipeline_examples": [
+    {
+      "id": "clean_report_all_real_citations",
+      "query_text": "Does this role require Kubernetes experience?",
+      "claims": [
+        {"id": "c1", "text": "The posting states Kubernetes experience is preferred, not required.", "status": "single_source", "confidence_score": 55}
+      ],
+      "fake_llm_summary": "Kubernetes experience is listed as preferred rather than required [c1].",
+      "fake_llm_uncertainties": [],
+      "expected_referenced_ids": ["c1"],
+      "expected_marker_stripping_leaves_unsupported_residue": false,
+      "note": "Well-behaved: every sentence cites a real claim it actually supports."
+    },
+    {
+      "id": "fake_citation_marker_residue_survives",
+      "query_text": "What is the salary range for this role?",
+      "claims": [
+        {"id": "c1", "text": "The posting does not mention a salary figure anywhere in its text.", "status": "single_source", "confidence_score": 50}
+      ],
+      "fake_llm_summary": "The role pays between $150,000 and $180,000 per year [c2].",
+      "fake_llm_uncertainties": ["The exact salary breakdown by level isn't published."],
+      "expected_referenced_ids": [],
+      "expected_marker_stripping_leaves_unsupported_residue": true,
+      "unsupported_residue_substring": "$150,000",
+      "note": "The real gap: [c2] isn't a real claim id, so the code strips the bracket — but the unsupported dollar-figure sentence survives untouched. This is app.research.report.draft_report's actual, present behavior, not a hypothetical."
+    },
+    {
+      "id": "no_marker_at_all_still_asserts_a_fact",
+      "query_text": "Who is the hiring manager for this role?",
+      "claims": [
+        {"id": "c1", "text": "The posting does not name a specific hiring manager.", "status": "single_source", "confidence_score": 50}
+      ],
+      "fake_llm_summary": "The hiring manager for this role is Sarah Chen, Director of Engineering.",
+      "fake_llm_uncertainties": [],
+      "expected_referenced_ids": [],
+      "expected_marker_stripping_leaves_unsupported_residue": true,
+      "unsupported_residue_substring": "Sarah Chen",
+      "note": "No citation marker was ever present to strip — the model simply asserted a fact with no citation at all, and nothing in draft_report rejects an uncited sentence."
+    },
+    {
+      "id": "empty_claims_uses_the_built_in_fallback",
+      "query_text": "Has this company had recent layoffs?",
+      "claims": [],
+      "fake_llm_summary": "",
+      "fake_llm_uncertainties": [],
+      "expected_referenced_ids": [],
+      "expected_marker_stripping_leaves_unsupported_residue": false,
+      "note": "draft_report short-circuits entirely when claims is empty — the fake LLM response is never even consulted."
+    }
+  ]
+}

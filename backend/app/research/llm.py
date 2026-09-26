@@ -10,6 +10,9 @@ provider is active is a config decision (`settings.llm_provider`), not a runtime
 
 import asyncio
 import json
+import time
+from contextvars import ContextVar
+from dataclasses import dataclass
 from typing import Any, Protocol, cast
 
 from app.config import Settings
@@ -22,6 +25,59 @@ logger = get_logger(__name__)
 _TRANSIENT_STATUS_CODES = {429, 500, 502, 503, 504}
 _MAX_RETRY_ATTEMPTS = 4
 _RETRY_BASE_DELAY_SECONDS = 2.0
+
+
+@dataclass(frozen=True)
+class LLMCallRecord:
+    """One real generate_structured() call, for the eval harness's cost/latency/token
+    report — nothing in the running app reads this; it's opt-in via record_llm_calls()."""
+
+    provider: str
+    model: str
+    schema_name: str
+    latency_ms: float
+    tokens_in: int | None
+    tokens_out: int | None
+
+
+# None (the default) means "nobody's listening" — every provider's recording call becomes a
+# no-op, so this has zero effect on normal request handling. The eval harness opts in per task
+# via record_llm_calls(), so concurrent tasks (and concurrent requests generally) each get
+# their own list rather than one shared one racing across coroutines/tasks.
+_call_records: ContextVar[list[LLMCallRecord] | None] = ContextVar("_call_records", default=None)
+
+
+def record_llm_calls() -> list[LLMCallRecord]:
+    """Starts recording every generate_structured() call made from this point on, within
+    this asyncio task (and tasks spawned from it — ContextVar propagates on task creation,
+    not across independently-scheduled tasks). Returns the (initially empty) list that fills
+    up as calls happen — read it after the task completes."""
+    records: list[LLMCallRecord] = []
+    _call_records.set(records)
+    return records
+
+
+def _record(
+    *,
+    provider: str,
+    model: str,
+    schema_name: str,
+    latency_ms: float,
+    tokens_in: int | None,
+    tokens_out: int | None,
+) -> None:
+    records = _call_records.get()
+    if records is not None:
+        records.append(
+            LLMCallRecord(
+                provider=provider,
+                model=model,
+                schema_name=schema_name,
+                latency_ms=latency_ms,
+                tokens_in=tokens_in,
+                tokens_out=tokens_out,
+            )
+        )
 
 
 class LLMError(RuntimeError):
@@ -66,6 +122,7 @@ class GeminiLLMProvider:
     ) -> dict[str, Any]:
         from google.genai import errors, types
 
+        start = time.perf_counter()
         attempt = 0
         while True:
             attempt += 1
@@ -107,9 +164,20 @@ class GeminiLLMProvider:
         if not text:
             raise LLMError("Gemini returned no structured output.")
         try:
-            return cast(dict[str, Any], json.loads(text))
+            parsed = cast(dict[str, Any], json.loads(text))
         except json.JSONDecodeError as exc:
             raise LLMError(f"Gemini returned output that wasn't valid JSON: {exc}") from exc
+
+        usage = getattr(response, "usage_metadata", None)
+        _record(
+            provider="gemini",
+            model=self._model,
+            schema_name=schema_name,
+            latency_ms=(time.perf_counter() - start) * 1000,
+            tokens_in=getattr(usage, "prompt_token_count", None) if usage else None,
+            tokens_out=getattr(usage, "candidates_token_count", None) if usage else None,
+        )
+        return parsed
 
 
 class AnthropicLLMProvider:
@@ -132,6 +200,7 @@ class AnthropicLLMProvider:
         json_schema: dict[str, Any],
         max_tokens: int,
     ) -> dict[str, Any]:
+        start = time.perf_counter()
         try:
             response = await self._client.messages.create(
                 model=self._model,
@@ -153,6 +222,15 @@ class AnthropicLLMProvider:
 
         for block in response.content:
             if block.type == "tool_use" and block.name == schema_name:
+                usage = getattr(response, "usage", None)
+                _record(
+                    provider="anthropic",
+                    model=self._model,
+                    schema_name=schema_name,
+                    latency_ms=(time.perf_counter() - start) * 1000,
+                    tokens_in=getattr(usage, "input_tokens", None) if usage else None,
+                    tokens_out=getattr(usage, "output_tokens", None) if usage else None,
+                )
                 return dict(block.input)
 
         raise LLMError("Anthropic response did not include the expected tool_use block.")
@@ -183,6 +261,7 @@ class GroqLLMProvider:
     ) -> dict[str, Any]:
         from groq import APIConnectionError, APIStatusError
 
+        start = time.perf_counter()
         attempt = 0
         while True:
             attempt += 1
@@ -241,11 +320,22 @@ class GroqLLMProvider:
         for call in tool_calls:
             if call.function.name == schema_name:
                 try:
-                    return cast(dict[str, Any], json.loads(call.function.arguments))
+                    parsed = cast(dict[str, Any], json.loads(call.function.arguments))
                 except json.JSONDecodeError as exc:
                     raise LLMError(
                         f"Groq returned tool-call arguments that weren't valid JSON: {exc}"
                     ) from exc
+
+                usage = getattr(response, "usage", None)
+                _record(
+                    provider="groq",
+                    model=self._model,
+                    schema_name=schema_name,
+                    latency_ms=(time.perf_counter() - start) * 1000,
+                    tokens_in=getattr(usage, "prompt_tokens", None) if usage else None,
+                    tokens_out=getattr(usage, "completion_tokens", None) if usage else None,
+                )
+                return parsed
 
         raise LLMError("Groq response did not include the expected tool call.")
 
