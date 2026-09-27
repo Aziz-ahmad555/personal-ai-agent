@@ -166,6 +166,11 @@ This is a single-user, self-hosted agent: everything it stores lives in **your o
 
 ## Quick start
 
+Want to poke at it before setting anything up? A public demo runs the same codebase against
+one shared, seeded account with real OAuth, real sending, and job-posting-by-URL capture
+disabled — see [docs/deployment.md](docs/deployment.md) for what "demo mode" changes and how
+that deployment is configured.
+
 ```bash
 git clone https://github.com/Aziz-ahmad555/personal-ai-agent.git && cd personal-ai-agent
 cp .env.example .env               # fill in real secrets — see Setup below for which ones you need

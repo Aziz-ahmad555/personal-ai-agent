@@ -1,0 +1,36 @@
+# Render Blueprint for the backend — see https://render.com/docs/blueprint-spec
+#
+# Deploys the same codebase as the personal deployment, with demo_mode=true and a shared
+# demo account. Render's free web-service tier sleeps after 15 minutes of inactivity (a
+# cold start costs ~1 minute) — acceptable for a portfolio demo, not for the personal
+# deployment. Postgres and Redis are NOT provisioned here on purpose: Render's free Postgres
+# expires after 30 days, so this uses Neon (Postgres + pgvector, scales to zero, no expiry)
+# and Upstash (Redis, free tier) instead — set DATABASE_URL and REDIS_URL below to those.
+#
+# Creating the actual Render/Neon/Upstash accounts and setting real secret values is a manual,
+# one-time step for whoever owns this deployment — see docs/deployment.md.
+
+services:
+  - type: web
+    name: personal-ai-agent-demo
+    runtime: python
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -e .
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: DEMO_MODE
+        value: "true"
+      - key: APP_SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        sync: false # set manually to the Neon connection string
+      - key: REDIS_URL
+        sync: false # set manually to the Upstash connection string
+      - key: CORS_ORIGINS
+        sync: false # set manually to the deployed frontend's origin
+      - key: RATE_LIMIT_STORAGE_URI
+        sync: false # same Upstash Redis, e.g. rediss://... — keeps rate limits shared across instances
