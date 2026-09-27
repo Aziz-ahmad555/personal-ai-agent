@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { ErrorState } from '@/components/layout/error-state'
 import { cn } from '@/lib/utils'
 import { useCaptureJob } from '@/features/career/hooks'
+import { isDemoMode } from '@/lib/demo'
 
 type Mode = 'paste' | 'url'
 
@@ -56,9 +57,10 @@ export function CaptureJobForm({ onCreated }: CaptureJobFormProps) {
                 type="button"
                 role="tab"
                 aria-selected={mode === value}
+                disabled={value === 'url' && isDemoMode}
                 onClick={() => setMode(value)}
                 className={cn(
-                  'rounded px-3 py-1 text-sm transition-colors',
+                  'rounded px-3 py-1 text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50',
                   mode === value ? 'bg-accent text-accent-foreground' : 'text-muted-foreground'
                 )}
               >
@@ -66,6 +68,11 @@ export function CaptureJobForm({ onCreated }: CaptureJobFormProps) {
               </button>
             ))}
           </div>
+          {isDemoMode && (
+            <p className="text-sm text-muted-foreground">
+              Capturing a posting by URL is disabled in this demo — paste the text instead.
+            </p>
+          )}
 
           {mode === 'paste' ? (
             <div className="space-y-2">

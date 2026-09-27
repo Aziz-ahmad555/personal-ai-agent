@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { ErrorState } from '@/components/layout/error-state'
 import { useStartOAuth } from '@/features/gmail/hooks'
+import { isDemoMode } from '@/lib/demo'
 
 export function ConnectPrompt() {
   const startOAuth = useStartOAuth()
@@ -42,10 +43,15 @@ export function ConnectPrompt() {
           />
         )}
 
-        <Button onClick={() => startOAuth.mutate()} disabled={startOAuth.isPending}>
+        <Button onClick={() => startOAuth.mutate()} disabled={startOAuth.isPending || isDemoMode}>
           <Mail className="h-4 w-4" />
           {startOAuth.isPending ? 'Redirecting…' : 'Connect Gmail (read-only)'}
         </Button>
+        {isDemoMode && (
+          <p className="text-sm text-muted-foreground">
+            Not available in this demo — real account connections are disabled.
+          </p>
+        )}
       </CardContent>
     </Card>
   )

@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { ErrorState } from '@/components/layout/error-state'
 import { useStartGithubOAuth } from '@/features/github/hooks'
+import { isDemoMode } from '@/lib/demo'
 
 export function ConnectPrompt({ reconnect = false }: { reconnect?: boolean }) {
   const start = useStartGithubOAuth()
@@ -60,10 +61,15 @@ export function ConnectPrompt({ reconnect = false }: { reconnect?: boolean }) {
           />
         )}
 
-        <Button onClick={() => start.mutate()} disabled={start.isPending}>
+        <Button onClick={() => start.mutate()} disabled={start.isPending || isDemoMode}>
           <Github className="h-4 w-4" />
           {start.isPending ? 'Redirecting…' : label}
         </Button>
+        {isDemoMode && (
+          <p className="text-sm text-muted-foreground">
+            Not available in this demo — real account connections are disabled.
+          </p>
+        )}
       </CardContent>
     </Card>
   )

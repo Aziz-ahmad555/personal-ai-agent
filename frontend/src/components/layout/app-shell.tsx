@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils'
 import { ThemeToggle } from '@/components/layout/theme-toggle'
 import { CommandPalette } from '@/components/ui/command-palette'
 import { ReauthBanner } from '@/components/layout/reauth-banner'
+import { DemoBanner } from '@/components/layout/demo-banner'
 import { useAuthStore } from '@/stores/auth'
 
 const NAV_ITEMS = [
@@ -71,6 +72,7 @@ export function AppShell() {
           )}
         </div>
       </header>
+      <DemoBanner />
       <ReauthBanner />
       <motion.main
         key={location.pathname}

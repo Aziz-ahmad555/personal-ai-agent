@@ -145,6 +145,12 @@ export const authApi = {
       body: JSON.stringify({ refresh_token: refreshToken }),
     })
   },
+
+  // Demo-mode-only server-side (404s otherwise) — issues a token pair for the one pre-seeded
+  // demo account, no password. See app/core/demo.py and scripts/seed_demo.py.
+  demoLogin() {
+    return apiFetch<TokenPair>('/auth/demo-login', { method: 'POST' })
+  },
 }
 
 // --- Profile Engine ---

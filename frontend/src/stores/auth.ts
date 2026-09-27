@@ -9,6 +9,7 @@ interface AuthState {
   isAuthenticating: boolean
   error: string | null
   login: (email: string, password: string) => Promise<void>
+  demoLogin: () => Promise<void>
   logout: () => void
 }
 
@@ -34,6 +35,24 @@ export const useAuthStore = create<AuthState>()(
           })
         } catch (err) {
           const message = err instanceof Error ? err.message : 'Login failed'
+          set({ isAuthenticating: false, error: message })
+          throw err
+        }
+      },
+
+      demoLogin: async () => {
+        set({ isAuthenticating: true, error: null })
+        try {
+          const tokens = await authApi.demoLogin()
+          const user = await authApi.me(tokens.access_token)
+          set({
+            accessToken: tokens.access_token,
+            refreshToken: tokens.refresh_token,
+            user,
+            isAuthenticating: false,
+          })
+        } catch (err) {
+          const message = err instanceof Error ? err.message : 'Could not start the demo'
           set({ isAuthenticating: false, error: message })
           throw err
         }
