@@ -3,7 +3,7 @@ import uuid
 from typing import Annotated
 
 import structlog
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -20,6 +20,7 @@ from app.career.resume_schemas import (
     ResumeGapRead,
     TailoredResumeRead,
 )
+from app.core.rate_limit import LLM_ACTION_RATE_LIMIT, limiter
 from app.db import base as db_base
 from app.db.base import get_db
 from app.db.models import User
@@ -101,7 +102,9 @@ async def _tailor_in_background(job_id: uuid.UUID, user_id: uuid.UUID) -> None:
 
 
 @router.post("/jobs/{job_id}/tailor", status_code=status.HTTP_202_ACCEPTED)
+@limiter.limit(LLM_ACTION_RATE_LIMIT)
 async def tailor_resume(
+    request: Request,
     job_id: uuid.UUID,
     background_tasks: BackgroundTasks,
     user: Annotated[User, Depends(get_current_user)],

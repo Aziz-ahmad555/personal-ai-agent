@@ -2,7 +2,7 @@ import uuid
 from typing import Annotated
 
 import structlog
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -19,6 +19,7 @@ from app.career.practice_schemas import (
     StartPracticeSessionRequest,
     SubmitPracticeAnswersRequest,
 )
+from app.core.rate_limit import LLM_ACTION_RATE_LIMIT, limiter
 from app.db import base as db_base
 from app.db.base import get_db
 from app.db.models import User
@@ -111,7 +112,9 @@ async def _feedback_in_background(session_id: uuid.UUID, user_id: uuid.UUID) -> 
 
 
 @router.post("/jobs/{job_id}/practice-sessions", status_code=status.HTTP_202_ACCEPTED)
+@limiter.limit(LLM_ACTION_RATE_LIMIT)
 async def start_practice_session(
+    request: Request,
     job_id: uuid.UUID,
     body: StartPracticeSessionRequest,
     background_tasks: BackgroundTasks,
@@ -190,7 +193,9 @@ async def get_practice_session(
 
 
 @router.patch("/practice-sessions/{session_id}/answers", status_code=status.HTTP_202_ACCEPTED)
+@limiter.limit(LLM_ACTION_RATE_LIMIT)
 async def submit_practice_answers(
+    request: Request,
     session_id: uuid.UUID,
     body: SubmitPracticeAnswersRequest,
     background_tasks: BackgroundTasks,

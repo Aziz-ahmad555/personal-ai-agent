@@ -2,7 +2,7 @@ import uuid
 from typing import Annotated
 
 import structlog
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -38,6 +38,8 @@ from app.career.schemas import (
     JobPostingRead,
 )
 from app.career.verification import employer_key_for, verify_and_assess_job
+from app.core.demo import require_not_demo_mode
+from app.core.rate_limit import LLM_ACTION_RATE_LIMIT, limiter
 from app.db import base as db_base
 from app.db.base import get_db
 from app.db.models import User
@@ -102,8 +104,15 @@ async def _build_job_read(
     )
 
 
-@router.post("/from-url", response_model=JobPostingRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/from-url",
+    response_model=JobPostingRead,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_not_demo_mode)],
+)
+@limiter.limit(LLM_ACTION_RATE_LIMIT)
 async def create_from_url(
+    request: Request,
     body: JobPostingCreateFromUrl,
     user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -118,7 +127,9 @@ async def create_from_url(
 
 
 @router.post("/paste", response_model=JobPostingRead, status_code=status.HTTP_201_CREATED)
+@limiter.limit(LLM_ACTION_RATE_LIMIT)
 async def create_from_paste(
+    request: Request,
     body: JobPostingCreateFromText,
     user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -226,7 +237,9 @@ async def _poll_feed_in_background(feed_id: uuid.UUID) -> None:
 
 
 @router.post("/feeds/{feed_id}/poll", status_code=status.HTTP_202_ACCEPTED)
+@limiter.limit(LLM_ACTION_RATE_LIMIT)
 async def poll_feed(
+    request: Request,
     feed_id: uuid.UUID,
     background_tasks: BackgroundTasks,
     user: Annotated[User, Depends(get_current_user)],
@@ -262,13 +275,20 @@ async def _verify_job_in_background(job_id: uuid.UUID, user_id: uuid.UUID) -> No
     # A fresh id per call — re-verification of the same job is possible, so job_id alone
     # wouldn't stay unique per invocation.
     structlog.contextvars.bind_contextvars(task_id=str(uuid.uuid4()))
+    # Missed in the original cost-guard rollout: employer verification calls
+    # run_research_query (app.career.verification) — a real, indirect get_llm_provider()
+    # call site, not just fraud detection's deterministic pattern-matching. Without this,
+    # SpendGuardedProvider's per-task limit and daily cap silently didn't apply here at all.
+    start_cost_guarded_task()
     async with db_base.async_session_factory() as db:
         await verify_and_assess_job(db, job_id, user_id=user_id)
         await db.commit()
 
 
 @router.post("/{job_id}/verify", status_code=status.HTTP_202_ACCEPTED)
+@limiter.limit(LLM_ACTION_RATE_LIMIT)
 async def verify_job(
+    request: Request,
     job_id: uuid.UUID,
     background_tasks: BackgroundTasks,
     user: Annotated[User, Depends(get_current_user)],
@@ -290,7 +310,9 @@ async def _match_job_in_background(job_id: uuid.UUID, user_id: uuid.UUID) -> Non
 
 
 @router.post("/{job_id}/match", status_code=status.HTTP_202_ACCEPTED)
+@limiter.limit(LLM_ACTION_RATE_LIMIT)
 async def match_job(
+    request: Request,
     job_id: uuid.UUID,
     background_tasks: BackgroundTasks,
     user: Annotated[User, Depends(get_current_user)],

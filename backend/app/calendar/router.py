@@ -24,6 +24,7 @@ from app.calendar.client import CalendarApiError, get_primary_calendar
 from app.calendar.models import CalendarConnection, CalendarEvent, CalendarSyncRun
 from app.calendar.schemas import ConnectionRead, DisconnectResult
 from app.config import get_settings
+from app.core.demo import require_not_demo_mode
 from app.db import base as db_base
 from app.db.base import get_db
 from app.db.models import User
@@ -59,7 +60,7 @@ async def get_connection(
     return await _get_connection(db, current_user.id)
 
 
-@router.get("/oauth/start")
+@router.get("/oauth/start", dependencies=[Depends(require_not_demo_mode)])
 async def oauth_start(
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> dict[str, str]:
@@ -72,7 +73,7 @@ async def oauth_start(
     return {"authorization_url": url}
 
 
-@router.get("/oauth/callback")
+@router.get("/oauth/callback", dependencies=[Depends(require_not_demo_mode)])
 async def oauth_callback(request: Request) -> RedirectResponse:
     """Hit by the browser on Google's redirect. There's no Bearer token here, so the signed
     `state` (not a cookie) identifies the user."""

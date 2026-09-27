@@ -22,6 +22,7 @@ from app.auth.schemas import (
     UserRegister,
 )
 from app.auth.security import create_token, decode_token, hash_password, verify_password
+from app.core.demo import DEMO_USER_EMAIL, require_demo_mode, require_not_demo_mode
 from app.core.rate_limit import limiter
 from app.db.base import get_db
 from app.db.models import User
@@ -89,6 +90,27 @@ async def login(
     )
 
 
+@router.post("/demo-login", response_model=TokenPair, dependencies=[Depends(require_demo_mode)])
+async def demo_login(db: Annotated[AsyncSession, Depends(get_db)]) -> TokenPair:
+    """Demo-mode-only (404s otherwise, see require_demo_mode): issues a real token pair for
+    the one pre-seeded demo user, no password exchange — there's no real credential to
+    protect here, since a visitor reaching this at all already means demo_mode is on and
+    nothing behind this login is anyone's real account. scripts/seed_demo.py creates this
+    user; if it hasn't run yet, this fails clearly rather than silently creating one."""
+    result = await db.execute(select(User).where(User.email == DEMO_USER_EMAIL))
+    user = result.scalar_one_or_none()
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Demo account not seeded yet.",
+        )
+    logger.info("demo_user_logged_in", user_id=str(user.id))
+    return TokenPair(
+        access_token=create_token(user.id, "access"),
+        refresh_token=create_token(user.id, "refresh"),
+    )
+
+
 @router.post("/refresh", response_model=TokenPair)
 async def refresh(
     payload: RefreshRequest,
@@ -131,7 +153,10 @@ async def me(current_user: Annotated[User, Depends(get_current_user)]) -> User:
 
 
 @router.post(
-    "/delete-account/request", response_model=AuditLogRead, status_code=status.HTTP_201_CREATED
+    "/delete-account/request",
+    response_model=AuditLogRead,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_not_demo_mode)],
 )
 async def request_delete_account(
     current_user: Annotated[User, Depends(get_current_user)],
@@ -148,7 +173,11 @@ async def request_delete_account(
     return AuditLogRead.model_validate(log)
 
 
-@router.post("/delete-account/{log_id}/decide", response_model=AccountDeletionResult)
+@router.post(
+    "/delete-account/{log_id}/decide",
+    response_model=AccountDeletionResult,
+    dependencies=[Depends(require_not_demo_mode)],
+)
 async def decide_delete_account(
     log_id: uuid.UUID,
     body: ApprovalDecision,

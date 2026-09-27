@@ -1,0 +1,45 @@
+name: Demo reset
+
+# Re-seeds the public demo's one demo account on a schedule, so the demo never drifts too far
+# from a clean, coherent state — the paste/board-polling/Research-Engine live-write surfaces
+# left enabled in demo mode (see app/config.py's demo_mode docstring and docs/decisions.md)
+# mean a visitor can add real rows, and this is what clears them back out.
+#
+# Deliberately a scheduled workflow that runs scripts/seed_demo.py directly against the demo
+# database, not a call into the running backend — the backend's own APScheduler is reserved
+# for the real, personal deployment's jobs (Gmail/GitHub/Calendar sync, feed polling, digest
+# generation), and scripts/ imports from backend/, never the reverse. This workflow is the
+# "external cron" that decision implies.
+#
+# No-ops safely until the demo is actually deployed: DEMO_DATABASE_URL is only set once the
+# repo owner adds it as a secret (Settings -> Secrets and variables -> Actions), pointing at
+# the demo's own Neon database — never the personal deployment's database.
+
+on:
+  schedule:
+    - cron: "0 6 * * *" # 06:00 UTC daily
+  workflow_dispatch: {}
+
+jobs:
+  reset:
+    name: Re-seed demo data
+    runs-on: ubuntu-latest
+    if: ${{ vars.DEMO_ENABLED == 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/pyproject.toml
+
+      - name: Install backend package
+        working-directory: backend
+        run: pip install -e .
+
+      - name: Re-seed the demo account
+        env:
+          DATABASE_URL: ${{ secrets.DEMO_DATABASE_URL }}
+          APP_SECRET_KEY: ${{ secrets.DEMO_APP_SECRET_KEY }}
+        run: python scripts/seed_demo.py

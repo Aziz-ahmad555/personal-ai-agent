@@ -121,6 +121,18 @@ class Settings(BaseSettings):
     max_tokens_per_task: int = 200_000
     daily_spend_cap_usd: float = 5.0
 
+    # The public portfolio demo runs against this same codebase with this one flag flipped —
+    # never a separate fork. When true: every real OAuth start/callback route and the full-
+    # account-deletion routes refuse outright (app.core.demo.require_not_demo_mode), and so
+    # does job-posting capture by URL specifically (app.career.router's /from-url) — that one
+    # feeds a visitor-supplied URL directly into the SSRF-guarded fetch pipeline
+    # (app.research.fetch), and "anyone on the internet" is a meaningfully different threat
+    # model from "the one trusted owner" for a direct-URL-fetch surface specifically. Capture
+    # by pasted text (no fetch involved) and board polling (a fixed set of known board-API
+    # domains, not an attacker-chosen target) stay enabled, as does the Research Engine's own
+    # live queries (Tavily picks which URLs get fetched, not the visitor). See docs/decisions.md.
+    demo_mode: bool = False
+
     @property
     def effective_rate_limit_storage_uri(self) -> str:
         return self.rate_limit_storage_uri or self.redis_url
