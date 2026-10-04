@@ -4,6 +4,10 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)
 
+**Live demo:** https://personal-ai-agent-demo.vercel.app — runs in demo mode on fictional sample data, with real Gmail, Calendar and GitHub connections turned off by design.
+
+The first load can take about a minute, because the free hosting sleeps when idle. A research question can take a few minutes; if one runs past 5, it stops with a clear message so you can retry.
+
 A personal, single-user AI agent that researches, verifies, and prepares — for job search, technical research, and staying on top of GitHub, Gmail, and Calendar — with a human approving before anything risky executes. Every claim it makes is traceable to real evidence; if the evidence isn't there, it says so instead of guessing.
 
 See [CLAUDE.md](CLAUDE.md) for the full philosophy and build standards this project is held to, and [docs/](docs/) for architecture, design decisions, and the full evaluation writeup.
@@ -163,6 +167,14 @@ This is a single-user, self-hosted agent: everything it stores lives in **your o
 - **The optional LLM README critique** for the GitHub recruiter-readiness review isn't built.
 
 **v2 backlog** (deliberately out of scope for now): LinkedIn tooling (no authorized API for a personal developer account — see [docs/decisions.md](docs/decisions.md)), Slack/WhatsApp integrations, a voice interface or mobile app, multi-user accounts, fine-tuning a custom model.
+
+## Try the demo
+
+1. Open the [live demo](https://personal-ai-agent-demo.vercel.app) and click **View the demo**.
+2. **Research**: ask a question and watch the sourced, cited answer come together.
+3. **Career**: open the sample job postings to see match scores, fraud checks and employer verification.
+4. **Applications**: review the tracked applications and their timelines.
+5. **GitHub**: accept or dismiss a pending skill proposal from the sample repositories.
 
 ## Quick start
 
