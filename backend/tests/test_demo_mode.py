@@ -110,6 +110,33 @@ async def test_job_capture_from_paste_is_not_blocked_in_demo_mode(
     assert response.status_code != 403
 
 
+async def test_gmail_sync_is_blocked_in_demo_mode(
+    client: AsyncClient, auth_headers: dict[str, str], demo_mode_on: None
+) -> None:
+    """Seeded demo connections carry no real encrypted tokens (no real OAuth ever happened for
+    them) — letting this through would mutate the seeded connection to needs_reauth and get a
+    visitor stuck looking at a broken Gmail connection they can't fix (reconnect is also
+    demo-blocked). No connection row exists for this test user at all; this still must 403
+    before ever reaching that 404, since the demo gate runs first."""
+    response = await client.post("/gmail/sync", headers=auth_headers)
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Not available in demo mode."
+
+
+async def test_github_sync_is_blocked_in_demo_mode(
+    client: AsyncClient, auth_headers: dict[str, str], demo_mode_on: None
+) -> None:
+    response = await client.post("/github/sync", headers=auth_headers)
+    assert response.status_code == 403
+
+
+async def test_calendar_sync_is_blocked_in_demo_mode(
+    client: AsyncClient, auth_headers: dict[str, str], demo_mode_on: None
+) -> None:
+    response = await client.post("/calendar/sync", headers=auth_headers)
+    assert response.status_code == 403
+
+
 async def test_gmail_oauth_start_works_normally_outside_demo_mode(
     client: AsyncClient, auth_headers: dict[str, str]
 ) -> None:

@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ErrorState } from '@/components/layout/error-state'
 import type { GithubConnection } from '@/lib/api'
 import { useGithubSyncRuns, useStartGithubSync } from '@/features/github/hooks'
+import { isDemoMode } from '@/lib/demo'
 
 const ACTIVE = new Set(['pending', 'running'])
 
@@ -38,7 +39,10 @@ export function SyncCard({ connection }: { connection: GithubConnection }) {
     <Card>
       <CardHeader className="flex-row items-start justify-between gap-3 space-y-0">
         <CardTitle className="text-base">Sync</CardTitle>
-        <Button onClick={() => start.mutate()} disabled={!canSync || active || start.isPending}>
+        <Button
+          onClick={() => start.mutate()}
+          disabled={!canSync || active || start.isPending || isDemoMode}
+        >
           {active ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
           {active ? 'Syncing…' : 'Sync now'}
         </Button>
@@ -51,6 +55,11 @@ export function SyncCard({ connection }: { connection: GithubConnection }) {
 
         {!canSync && (
           <p className="text-muted-foreground">Reconnect GitHub above before syncing.</p>
+        )}
+        {isDemoMode && canSync && (
+          <p className="text-muted-foreground">
+            Not available in this demo — this sample data doesn&apos;t sync against a real account.
+          </p>
         )}
 
         {start.isError && (

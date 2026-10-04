@@ -120,7 +120,12 @@ async def _run_sync_in_background(sync_run_id: uuid.UUID) -> None:
         await run_sync(db, sync_run_id)
 
 
-@router.post("/sync", response_model=SyncRunRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/sync",
+    response_model=SyncRunRead,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_not_demo_mode)],
+)
 async def start_sync(
     background_tasks: BackgroundTasks,
     current_user: Annotated[User, Depends(get_current_user)],

@@ -18,6 +18,7 @@ from app.calendar.schemas import (
     SyncRunRead,
 )
 from app.career.models import Application, JobPosting
+from app.core.demo import require_not_demo_mode
 from app.db import base as db_base
 from app.db.base import get_db
 from app.db.models import User
@@ -51,7 +52,12 @@ async def _run_in_background(run_id: uuid.UUID) -> None:
         await sync_service.run_sync(db, run_id)
 
 
-@router.post("/sync", response_model=SyncRunRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/sync",
+    response_model=SyncRunRead,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_not_demo_mode)],
+)
 async def start_sync(
     background_tasks: BackgroundTasks,
     current_user: Annotated[User, Depends(get_current_user)],

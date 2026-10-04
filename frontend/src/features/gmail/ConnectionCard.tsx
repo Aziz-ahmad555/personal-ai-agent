@@ -7,6 +7,7 @@ import type { GmailConnection } from '@/lib/api'
 import { ConnectionStatusBadge } from '@/features/gmail/badges'
 import { DisconnectDialog } from '@/features/gmail/DisconnectDialog'
 import { useStartOAuth, useStartSync } from '@/features/gmail/hooks'
+import { isDemoMode } from '@/lib/demo'
 
 export function ConnectionCard({ connection }: { connection: GmailConnection }) {
   const startSync = useStartSync()
@@ -57,7 +58,7 @@ export function ConnectionCard({ connection }: { connection: GmailConnection }) 
               {startOAuth.isPending ? 'Redirecting…' : 'Reconnect'}
             </Button>
           ) : (
-            <Button onClick={() => startSync.mutate()} disabled={startSync.isPending}>
+            <Button onClick={() => startSync.mutate()} disabled={startSync.isPending || isDemoMode}>
               <RefreshCw className="h-4 w-4" />
               {startSync.isPending ? 'Starting…' : 'Sync now'}
             </Button>
@@ -66,6 +67,11 @@ export function ConnectionCard({ connection }: { connection: GmailConnection }) 
             Disconnect
           </Button>
         </div>
+        {isDemoMode && !needsReauth && (
+          <p className="text-sm text-muted-foreground">
+            Not available in this demo — this sample data doesn&apos;t sync against a real account.
+          </p>
+        )}
       </CardContent>
 
       <DisconnectDialog open={disconnectOpen} onOpenChange={setDisconnectOpen} />
