@@ -7,6 +7,15 @@
 # expires after 30 days, so this uses Neon (Postgres + pgvector, scales to zero, no expiry)
 # and Upstash (Redis, free tier) instead — set DATABASE_URL and REDIS_URL below to those.
 #
+# background_scheduler_enabled is false here specifically: the demo's data is reset by
+# scripts/seed_demo.py on an external GitHub Actions cron (.github/workflows/demo-reset.yml),
+# not by this app's own APScheduler — the two would otherwise both be writing to the same rows
+# on different schedules. daily_spend_cap_usd and max_tokens_per_task are set lower than this
+# project's personal-deployment defaults (5.0 / 200_000 in app/config.py) because the demo's
+# LLM-cost endpoints are rate-limited per-IP, not per-account — many anonymous visitors can
+# each use their own 10/hour allowance in the same day, which a personal single-user deployment
+# never has to account for.
+#
 # Creating the actual Render/Neon/Upstash accounts and setting real secret values is a manual,
 # one-time step for whoever owns this deployment — see docs/deployment.md.
 
@@ -15,6 +24,7 @@ services:
     name: personal-ai-agent-demo
     runtime: python
     plan: free
+    region: frankfurt
     rootDir: backend
     buildCommand: pip install -e .
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
@@ -24,13 +34,23 @@ services:
         value: production
       - key: DEMO_MODE
         value: "true"
+      - key: BACKGROUND_SCHEDULER_ENABLED
+        value: "false"
+      - key: DAILY_SPEND_CAP_USD
+        value: "1"
+      - key: MAX_TOKENS_PER_TASK
+        value: "100000"
       - key: APP_SECRET_KEY
         generateValue: true
       - key: DATABASE_URL
-        sync: false # set manually to the Neon connection string
+        sync: false # Neon direct (non-pooler) connection string, postgresql+asyncpg://...?ssl=require
       - key: REDIS_URL
-        sync: false # set manually to the Upstash connection string
+        sync: false # Upstash connection string (prefer the TLS one: rediss://...)
       - key: CORS_ORIGINS
-        sync: false # set manually to the deployed frontend's origin
-      - key: RATE_LIMIT_STORAGE_URI
-        sync: false # same Upstash Redis, e.g. rediss://... — keeps rate limits shared across instances
+        sync: false # leave blank for now; set to the Vercel URL once the frontend is deployed
+      - key: GROQ_API_KEY
+        sync: false # powers every live LLM feature left enabled in the demo (default llm_provider)
+      - key: TAVILY_API_KEY
+        sync: false # powers the Research Engine's live web search
+      - key: VOYAGE_API_KEY
+        sync: false # powers embeddings for /search and the Research Engine
