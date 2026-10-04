@@ -26,7 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import Settings, get_settings
 from app.logging import get_logger
 from app.research.dedupe import content_hash, find_semantic_duplicates, normalize_url
-from app.research.embeddings import embed_and_store
+from app.research.embeddings import embed_and_store_batch
 from app.research.extraction import SourceExcerpt, extract_claims
 from app.research.fetch import FetchResult, fetch_source
 from app.research.llm import LLMError, LLMProvider, get_llm_provider
@@ -230,17 +230,15 @@ def build_pipeline(
 
         # Semantic dedup (Voyage embeddings) among what's left.
         remaining = [s for s in verified if str(s.id) not in duplicate_of]
-        embeddings: dict[str, list[float]] = {}
-        for s in remaining:
-            vectors = await embed_and_store(
-                db,
-                query_id=query_uuid,
-                owner_type="source_chunk",
-                owner_id=s.id,
-                text=s.content or "",
-            )
-            if vectors:
-                embeddings[str(s.id)] = vectors[0]
+        vectors_by_source = await embed_and_store_batch(
+            db,
+            query_id=query_uuid,
+            owner_type="source_chunk",
+            items=[(s.id, s.content or "") for s in remaining],
+        )
+        embeddings: dict[str, list[float]] = {
+            str(source_id): vectors[0] for source_id, vectors in vectors_by_source.items()
+        }
         if embeddings:
             duplicate_of.update(find_semantic_duplicates(embeddings))
 
@@ -299,6 +297,7 @@ def build_pipeline(
             return {"error": str(exc)}
 
         claim_ids: list[str] = []
+        claim_texts: list[tuple[uuid.UUID, str]] = []
         for extracted in result.claims:
             resolved = [
                 (
@@ -360,15 +359,10 @@ def build_pipeline(
                     )
                 )
 
-            await embed_and_store(
-                db,
-                query_id=query_uuid,
-                owner_type="claim",
-                owner_id=claim.id,
-                text=extracted.claim_text,
-            )
+            claim_texts.append((claim.id, extracted.claim_text))
             claim_ids.append(str(claim.id))
 
+        await embed_and_store_batch(db, query_id=query_uuid, owner_type="claim", items=claim_texts)
         await db.flush()
         return {"claim_ids": claim_ids, "extraction_uncertainties": result.uncertainties}
 

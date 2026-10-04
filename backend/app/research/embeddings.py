@@ -15,6 +15,8 @@ from app.research.models import ResearchEmbedding
 logger = get_logger(__name__)
 
 CHUNK_SIZE = 1500
+# Voyage accepts at most this many input texts per request; larger batches are split.
+VOYAGE_MAX_BATCH_INPUTS = 128
 
 
 def chunk_text(text: str, chunk_size: int = CHUNK_SIZE) -> list[str]:
@@ -24,30 +26,38 @@ def chunk_text(text: str, chunk_size: int = CHUNK_SIZE) -> list[str]:
     return [text[i : i + chunk_size] for i in range(0, len(text), chunk_size)]
 
 
-async def embed_and_store(
+async def embed_and_store_batch(
     db: AsyncSession,
     *,
     query_id: uuid.UUID,
     owner_type: str,
-    owner_id: uuid.UUID,
-    text: str,
-) -> list[list[float]] | None:
-    """Chunks `text`, embeds each chunk, and stores one ResearchEmbedding row per chunk.
-    Returns the embedding vectors (so a caller doing same-call semantic dedup doesn't need
-    a round trip back to the DB), or None if embeddings are disabled — callers must treat
-    that as "skipped", falling back to exact-hash dedup only, never fabricate a vector."""
-    chunks = chunk_text(text)
-    if not chunks:
-        return None
+    items: list[tuple[uuid.UUID, str]],
+) -> dict[uuid.UUID, list[list[float]]]:
+    """Chunks each (owner_id, text), embeds every chunk in as few Voyage requests as possible,
+    and stores one ResearchEmbedding row per chunk. Returns the vectors per owner (so a caller
+    doing same-call semantic dedup doesn't need a round trip back to the DB). Owners whose
+    text is empty, or every owner when embeddings are disabled or unavailable, are simply
+    absent from the result — callers must treat that as "skipped", never fabricate a vector."""
+    chunked: list[tuple[uuid.UUID, int, str]] = [
+        (owner_id, index, chunk)
+        for owner_id, text in items
+        for index, chunk in enumerate(chunk_text(text))
+    ]
+    if not chunked:
+        return {}
 
-    vectors = await embed_texts(chunks)
-    if vectors is None:
-        # embed_texts() already logged the specific reason (no key vs. API error) — this
-        # just ties that skip to the research row it would have embedded, for audit.
-        logger.warning("research_embedding_skipped", owner_type=owner_type, owner_id=str(owner_id))
-        return None
+    all_vectors: list[list[float]] = []
+    for start in range(0, len(chunked), VOYAGE_MAX_BATCH_INPUTS):
+        batch = [chunk for _, _, chunk in chunked[start : start + VOYAGE_MAX_BATCH_INPUTS]]
+        vectors = await embed_texts(batch)
+        if vectors is None:
+            # embed_texts() already logged the specific reason (no key vs. API error).
+            logger.warning("research_embedding_skipped", owner_type=owner_type, count=len(chunked))
+            return {}
+        all_vectors.extend(vectors)
 
-    for index, (chunk, vector) in enumerate(zip(chunks, vectors, strict=True)):
+    by_owner: dict[uuid.UUID, list[list[float]]] = {}
+    for (owner_id, index, chunk), vector in zip(chunked, all_vectors, strict=True):
         db.add(
             ResearchEmbedding(
                 query_id=query_id,
@@ -58,5 +68,5 @@ async def embed_and_store(
                 embedding=vector,
             )
         )
-
-    return vectors
+        by_owner.setdefault(owner_id, []).append(vector)
+    return by_owner

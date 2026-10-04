@@ -187,7 +187,8 @@ async def fetch_source(url: str, *, timeout_seconds: float, max_chars: int) -> F
         return FetchResult(final_url, status, None, None, None, error)
 
     text_body = body.decode(response.encoding or "utf-8", errors="replace")
-    extracted_json = trafilatura.extract(
+    extracted_json = await asyncio.to_thread(
+        trafilatura.extract,
         text_body,
         output_format="json",
         with_metadata=True,

@@ -328,3 +328,96 @@ async def test_a_recently_started_running_query_is_not_reported_as_stalled(
 
     assert detail["status"] == "running"
     assert detail["error"] is None
+
+
+async def test_a_research_run_makes_one_voyage_request_for_sources_and_one_for_claims(
+    client: AsyncClient,
+    auth_headers: dict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Regression guard for the free Voyage tier's 3-requests-per-minute limit: per-source and
+    per-claim embedding calls made a single run take several minutes of rate-limit waiting."""
+    url_two = "https://acme.example.com/careers/platform-engineer"
+    content_two = CONTENT.replace("machine learning", "platform") + " Kubernetes is preferred."
+    search_results = [
+        SearchResult(url=URL, title="ML Engineer at Acme", snippet="a", rank=0),
+        SearchResult(url=url_two, title="Platform Engineer at Acme", snippet="b", rank=1),
+    ]
+    fetch_results = {
+        URL: FetchResult(
+            final_url=URL,
+            http_status=200,
+            content=CONTENT,
+            title="ML Engineer",
+            published_at=datetime(2026, 9, 1, tzinfo=UTC),
+            fetch_error=None,
+        ),
+        url_two: FetchResult(
+            final_url=url_two,
+            http_status=200,
+            content=content_two,
+            title="Platform Engineer",
+            published_at=datetime(2026, 9, 1, tzinfo=UTC),
+            fetch_error=None,
+        ),
+    }
+    extraction_payload = {
+        "claims": [
+            {
+                "claim_text": "The ML role requires 5 years of PyTorch experience.",
+                "claim_type": "requirement",
+                "citations": [
+                    {
+                        "source_id": "s1",
+                        "excerpt": "5 years of experience with PyTorch and computer vision",
+                        "stance": "supports",
+                    }
+                ],
+            },
+            {
+                "claim_text": "The platform role prefers Kubernetes experience.",
+                "claim_type": "requirement",
+                "citations": [
+                    {
+                        "source_id": "s2",
+                        "excerpt": "Kubernetes is preferred.",
+                        "stance": "supports",
+                    }
+                ],
+            },
+        ],
+        "uncertainties": [],
+    }
+    report_payload = {"summary": "Two roles.", "uncertainties": []}
+    _patch_pipeline_dependencies(
+        monkeypatch,
+        search_results=search_results,
+        fetch_results=fetch_results,
+        llm_payloads=[extraction_payload, report_payload],
+    )
+
+    voyage_requests: list[int] = []
+    vectors_seen: list[list[float]] = []
+
+    async def _recording_embed_texts(texts: list[str], *, input_type: str = "document") -> list:
+        voyage_requests.append(len(texts))
+        # Orthogonal vectors: parallel fakes would make semantic dedup drop one of the sources.
+        vectors = []
+        for _ in texts:
+            vector = [0.0] * 512
+            vector[len(vectors_seen)] = 1.0
+            vectors_seen.append(vector)
+            vectors.append(vector)
+        return vectors
+
+    monkeypatch.setattr("app.research.embeddings.embed_texts", _recording_embed_texts)
+
+    create = await client.post(
+        "/research/queries", headers=auth_headers, json={"query_text": "Two roles at Acme"}
+    )
+    body = (
+        await client.get(f"/research/queries/{create.json()['id']}", headers=auth_headers)
+    ).json()
+
+    assert body["status"] == "completed"
+    assert voyage_requests == [2, 2]
