@@ -17,6 +17,27 @@ from app.profile.models import Preferences, Profile, ProfileEmbedding
 _real_embed_texts = embeddings.embed_texts
 
 
+async def test_voyage_client_is_built_with_a_finite_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The SDK's own default is no timeout at all — a stalled request would hang its caller."""
+    built: dict[str, object] = {}
+
+    class _RecordingClient:
+        def __init__(self, **kwargs: object) -> None:
+            built.update(kwargs)
+
+    monkeypatch.setattr(embeddings, "_client", None)
+    monkeypatch.setattr(embeddings, "AsyncClient", _RecordingClient)
+    monkeypatch.setattr(
+        embeddings, "get_settings", lambda: types.SimpleNamespace(voyage_api_key="test-key")
+    )
+
+    embeddings._get_client()
+
+    assert built["timeout"] == embeddings.VOYAGE_TIMEOUT_SECONDS == 30.0
+
+
 async def test_get_client_returns_none_without_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(embeddings, "_client", None)
     monkeypatch.setattr(

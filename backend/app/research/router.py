@@ -19,7 +19,7 @@ from app.research.models import (
     ResearchQuerySource,
     ResearchSource,
 )
-from app.research.pipeline import run_research_query
+from app.research.pipeline import STALLED_MESSAGE, is_stalled, run_research_query
 from app.research.schemas import (
     ClaimRead,
     ResearchQueryCreate,
@@ -65,17 +65,31 @@ async def create_query(
     return query
 
 
+def _reported_status(query: ResearchQuery) -> tuple[str, str | None]:
+    if is_stalled(query):
+        return "failed", STALLED_MESSAGE
+    return query.status, query.error
+
+
 @router.get("/queries", response_model=list[ResearchQueryRead])
 async def list_queries(
     user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
-) -> list[ResearchQuery]:
+) -> list[ResearchQueryRead]:
     result = await db.execute(
         select(ResearchQuery)
         .where(ResearchQuery.user_id == user.id)
         .order_by(ResearchQuery.created_at.desc())
     )
-    return list(result.scalars().all())
+    reads = []
+    for query in result.scalars().all():
+        status, error = _reported_status(query)
+        reads.append(
+            ResearchQueryRead.model_validate(query).model_copy(
+                update={"status": status, "error": error}
+            )
+        )
+    return reads
 
 
 async def _get_owned_query(
@@ -126,12 +140,13 @@ async def get_query(
 
     await db.refresh(query, attribute_names=["report"])
 
+    status, error = _reported_status(query)
     return ResearchQueryDetail(
         id=query.id,
         query_text=query.query_text,
         purpose=query.purpose,
-        status=query.status,
-        error=query.error,
+        status=status,
+        error=error,
         created_at=query.created_at,
         completed_at=query.completed_at,
         sources=[SourceRead.model_validate(s) for s in source_rows],

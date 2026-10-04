@@ -27,6 +27,9 @@ _TRANSIENT_ERRORS = (
 )
 _MAX_RETRY_ATTEMPTS = 4
 _RETRY_BASE_DELAY_SECONDS = 2.0
+# The voyageai SDK defaults to no timeout at all, so a stalled HTTP request would otherwise
+# block its caller indefinitely.
+VOYAGE_TIMEOUT_SECONDS = 30.0
 
 
 def _get_client() -> AsyncClient | None:
@@ -35,7 +38,7 @@ def _get_client() -> AsyncClient | None:
     if not settings.voyage_api_key:
         return None
     if _client is None:
-        _client = AsyncClient(api_key=settings.voyage_api_key)
+        _client = AsyncClient(api_key=settings.voyage_api_key, timeout=VOYAGE_TIMEOUT_SECONDS)
     return _client
 
 

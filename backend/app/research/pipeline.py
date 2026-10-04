@@ -47,6 +47,15 @@ logger = get_logger(__name__)
 
 SOURCE_FRESHNESS = timedelta(hours=24)
 
+# A whole research run is capped here so a slow or hung step can't leave a query at "running"
+# indefinitely. A run still "running" past the cap plus a grace period is reported as failed
+# on read — that's what catches a run whose background task died with its server process,
+# where this in-process cap never fires at all.
+QUERY_TIMEOUT = timedelta(minutes=5)
+STALL_GRACE = timedelta(minutes=1)
+TIMEOUT_MESSAGE = "This research took too long and was stopped. Please try again."
+STALLED_MESSAGE = "This research stopped responding before it finished. Please try again."
+
 
 class PipelineState(TypedDict, total=False):
     query_id: str
@@ -445,6 +454,12 @@ def build_pipeline(
     return graph.compile()
 
 
+def is_stalled(query: ResearchQuery, *, now: datetime | None = None) -> bool:
+    if query.status not in ("pending", "running"):
+        return False
+    return (now or datetime.now(UTC)) - _as_utc(query.created_at) > QUERY_TIMEOUT + STALL_GRACE
+
+
 async def run_research_query(db: AsyncSession, query_id: uuid.UUID) -> None:
     """Entry point for the background task. Owns the full lifecycle: marks the query
     running, executes the pipeline, and always leaves it in a terminal completed/failed
@@ -465,15 +480,24 @@ async def run_research_query(db: AsyncSession, query_id: uuid.UUID) -> None:
         pipeline = build_pipeline(
             db=db, settings=settings, search_provider=search_provider, llm_provider=llm_provider
         )
-        final_state: PipelineState = await pipeline.ainvoke(
-            {
-                "query_id": str(query_id),
-                "query_text": query.query_text,
-                "purpose": query.purpose,
-                "error": None,
-            }
+        final_state: PipelineState = await asyncio.wait_for(
+            pipeline.ainvoke(
+                {
+                    "query_id": str(query_id),
+                    "query_text": query.query_text,
+                    "purpose": query.purpose,
+                    "error": None,
+                }
+            ),
+            timeout=QUERY_TIMEOUT.total_seconds(),
         )
         error = final_state.get("error")
+    except TimeoutError:
+        logger.warning("research_pipeline_timed_out", query_id=str(query_id))
+        await db.rollback()
+        query = await db.get(ResearchQuery, query_id)
+        assert query is not None
+        error = TIMEOUT_MESSAGE
     except (SearchError, LLMError) as exc:
         error = str(exc)
     except Exception as exc:  # last-resort guardrail: a crash must still resolve the query

@@ -5,14 +5,18 @@ including the two guardrails that matter most: a claim whose citation doesn't ve
 against the real stored source text gets forced to "unverified", and a claim citing a
 source id the model was never given gets dropped entirely."""
 
+import asyncio
 import types
-from datetime import UTC, datetime
+import uuid
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from httpx import AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.research import pipeline as pipeline_module
 from app.research.fetch import FetchResult
+from app.research.models import ResearchQuery
 from app.research.search import SearchResult
 
 CONTENT = (
@@ -251,3 +255,76 @@ async def test_query_fails_cleanly_when_no_sources_verify(
     assert body["claims"] == []
     assert body["sources"][0]["fetch_error"] == "http_404"
     assert body["report"]["summary"] == "No verified claims were found for this query."
+
+
+class _SlowSearchProvider:
+    async def search(self, query: str, max_results: int) -> list[SearchResult]:
+        await asyncio.sleep(2)
+        return []
+
+
+async def test_a_run_past_the_time_cap_fails_with_a_clear_retry_message(
+    client: AsyncClient,
+    auth_headers: dict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(pipeline_module, "QUERY_TIMEOUT", timedelta(milliseconds=100))
+    monkeypatch.setattr(pipeline_module, "get_search_provider", lambda: _SlowSearchProvider())
+
+    create = await client.post(
+        "/research/queries", headers=auth_headers, json={"query_text": "Slow question"}
+    )
+    query_id = create.json()["id"]
+
+    body = (await client.get(f"/research/queries/{query_id}", headers=auth_headers)).json()
+
+    assert body["status"] == "failed"
+    assert body["error"] == pipeline_module.TIMEOUT_MESSAGE
+
+
+async def test_a_run_still_running_long_after_the_cap_reads_as_failed(
+    client: AsyncClient,
+    auth_headers: dict[str, str],
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """The in-process cap never fires if the server died mid-run, so the row is left at
+    "running" forever — the read path has to report it as failed instead."""
+    me = (await client.get("/auth/me", headers=auth_headers)).json()
+    long_ago = datetime.now(UTC) - pipeline_module.QUERY_TIMEOUT - timedelta(minutes=10)
+    async with session_factory() as db:
+        query = ResearchQuery(
+            user_id=uuid.UUID(me["id"]),
+            query_text="Orphaned question",
+            status="running",
+            created_at=long_ago,
+        )
+        db.add(query)
+        await db.commit()
+        query_id = str(query.id)
+
+    detail = (await client.get(f"/research/queries/{query_id}", headers=auth_headers)).json()
+    listed = (await client.get("/research/queries", headers=auth_headers)).json()
+
+    assert detail["status"] == "failed"
+    assert detail["error"] == pipeline_module.STALLED_MESSAGE
+    assert listed[0]["status"] == "failed"
+
+
+async def test_a_recently_started_running_query_is_not_reported_as_stalled(
+    client: AsyncClient,
+    auth_headers: dict[str, str],
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    me = (await client.get("/auth/me", headers=auth_headers)).json()
+    async with session_factory() as db:
+        query = ResearchQuery(
+            user_id=uuid.UUID(me["id"]), query_text="Fresh question", status="running"
+        )
+        db.add(query)
+        await db.commit()
+        query_id = str(query.id)
+
+    detail = (await client.get(f"/research/queries/{query_id}", headers=auth_headers)).json()
+
+    assert detail["status"] == "running"
+    assert detail["error"] is None
