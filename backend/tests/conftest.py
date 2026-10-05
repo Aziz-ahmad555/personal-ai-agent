@@ -4,7 +4,7 @@ from datetime import UTC, date, datetime
 
 os.environ.setdefault("APP_SECRET_KEY", "test-secret-key-not-for-production-use")
 os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///:memory:")
-os.environ.setdefault("TOKEN_ENCRYPTION_KEY", "Emb1Qfnswo7SlMmYcYu1OjTpVMmleBlkM_lpO-nh2Eo=")
+os.environ.setdefault("TOKEN_ENCRYPTION_KEY", "eozxtJev26O9zrNqtEAS3zTq00aNtt9IaalJtg5qBZo=")
 os.environ.setdefault("GOOGLE_CLIENT_ID", "test-client-id.apps.googleusercontent.com")
 os.environ.setdefault("GOOGLE_CLIENT_SECRET", "test-client-secret")
 os.environ.setdefault("GITHUB_CLIENT_ID", "test-github-client-id")
