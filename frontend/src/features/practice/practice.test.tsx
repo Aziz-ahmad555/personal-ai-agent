@@ -232,8 +232,6 @@ describe('PracticeSessionView', () => {
   })
 
   it('offers a retry with existing answers when feedback failed, but not when questions never generated', async () => {
-    const { unmount } = renderAt(<PracticeSessionView sessionId="s1" jobId="job-1" />)
-    unmount()
     stubApi({
       '/career/practice-sessions/s1': () =>
         json(
