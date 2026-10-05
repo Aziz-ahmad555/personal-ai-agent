@@ -25,7 +25,7 @@ backend/
     core/         Rate limiting, health checks, the background scheduler
     db/           SQLAlchemy Base, async session factory
   alembic/        Migrations — a fresh clone builds the schema from nothing (verified)
-  tests/          785 tests; tests/conftest.py is the shared test infrastructure
+  tests/          814 tests; tests/conftest.py is the shared test infrastructure
 frontend/
   src/
     features/     One folder per domain (profile, research, career, gmail, github, calendar,
@@ -175,8 +175,9 @@ across all three), and follow the same connect → sync → disconnect shape:
   computed from the last sync's snapshot so viewing it makes zero new GitHub requests.
 - **Calendar**: `calendar.events.readonly`, its own independently-revocable connection (own
   callback, own OAuth state-token type, own DB row) even though it shares Gmail's Google Cloud
-  project. Event reading and interview/deadline detection aren't built yet — only the connection
-  itself is (see the README's Limitations).
+  project. Sync reads the primary calendar; each event is classified as an interview, deadline or
+  other by deterministic matching (`app.calendar.detect`), and application links are proposals a user
+  can correct. Nothing is written to Google, and reminders aren't built (see the README's Limitations).
 
 ## Reporting
 

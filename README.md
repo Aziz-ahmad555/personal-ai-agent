@@ -8,6 +8,8 @@
 
 The first load can take about a minute, because the free hosting sleeps when idle. A research question can take a few minutes; if one runs past 5, it stops with a clear message so you can retry.
 
+Release notes, measured results and known limitations for v1.0.0: [CHANGELOG.md](CHANGELOG.md).
+
 A personal, single-user AI agent that researches, verifies, and prepares — for job search, technical research, and staying on top of GitHub, Gmail, and Calendar — with a human approving before anything risky executes. Every claim it makes is traceable to real evidence; if the evidence isn't there, it says so instead of guessing.
 
 See [CLAUDE.md](CLAUDE.md) for the full philosophy and build standards this project is held to, and [docs/](docs/) for architecture, design decisions, and the full evaluation writeup.
@@ -20,7 +22,7 @@ See [CLAUDE.md](CLAUDE.md) for the full philosophy and build standards this proj
 4. **Career Intelligence** — job discovery (manual capture + Greenhouse/Lever/Ashby/USAJobs board polling) → employer verification & fraud/scam detection → weighted match scoring (evidence-only, never keyword-only) → an application tracker → resume tailoring (a reviewable diff, never a silent rewrite) → fact-checked cover letters → an ATS compatibility checker → interview practice with scored feedback.
 5. **Gmail integration** (read-only) — OAuth2, `gmail.readonly` only, encrypted tokens, incremental sync with automatic backfill fallback.
 6. **GitHub integration** (read-only) — repo import as skill evidence (deterministic, no LLM) and a recruiter-readiness review of your own public repos.
-7. **Calendar integration** (read-only) — connected today; event reading and interview/deadline detection are the next sub-step (see [Limitations](#limitations-and-roadmap)).
+7. **Calendar integration** (read-only) — syncs your primary calendar and classifies each event as an interview, a deadline or other, using deterministic phrase and domain matching that shows the evidence behind each result. It proposes links to tracked applications, and you can correct any classification. Calendar never writes to Google and has no reminders yet (see [Limitations](#limitations-and-roadmap)).
 8. **Reporting** — a weekly digest aggregating career/research/Gmail/GitHub/Calendar activity and "needs attention" signals, exportable as PDF.
 9. **Audit & Approval system** — every risky action is Green (automatic), Yellow (you confirm), or Red (you confirm *and* the server independently re-verifies before honoring it) — see [Safety by design](#safety-by-design).
 10. **Autonomous scheduling** — the already-Green, read-only actions (GitHub/job-feed/Gmail/Calendar sync, digest generation) now also run on a schedule, not just on a click, with a kill switch and a reauth banner so a silent failure surfaces the next time the app is open.
@@ -42,9 +44,9 @@ Measured, not assumed — from the eval harness (`evals/run_all.py`; methodology
 | LLM-judge calibration | **14/14 (100%)** | The judge's faithful/relevant verdicts agree with hand-assigned human labels on every gold-set example |
 | Judge-scored faithfulness/relevance | **15/15** | Scenario grid: faithful+relevant, unfaithful, irrelevant, hedged, contradicted-by-a-second-source, etc. |
 | Baseline comparison | 3/3 | See note below — this one doesn't show what you'd expect |
-| Backend test suite | **785 passed** | Full suite, `pytest --cov=app` |
-| Frontend test suite | **227 passed** | `vitest run` |
-| Backend coverage | **83%** | 9,109 statements, 1,527 missed — measured 2026-09-26 |
+| Backend test suite | **814 passed** | Full suite, `pytest --cov=app` |
+| Frontend test suite | **240 passed** | `vitest run` |
+| Backend coverage | **84%** | 9,183 statements, 1,509 missed — measured 2026-10-05 |
 
 **Honest note on the baseline comparison:** this check sends the same source text to a raw model with no retrieval/citation pipeline, to see whether it fabricates specifics the source never stated (a salary figure, a hiring manager's name, a team size). In the runs recorded so far, the raw model didn't fabricate on these particular narrow, omission-type questions either — so this specific comparison is a **regression canary**, not proof the verification pipeline is dramatically outperforming a plain LLM call. The pipeline's real value shows up in the adversarial and hallucination-precision numbers above, where the *source text itself* contains the injected/fabricated claim — that's the case a citation-verified quote check alone can't catch, and where the pipeline's deterministic verifiers (not the model) are what actually holds the line.
 
@@ -148,7 +150,7 @@ This is a single-user, self-hosted agent: everything it stores lives in **your o
 
 **What's stored:** your profile (bio, work history, education, skills and their evidence history), preferences, research queries/claims/sources, career data (postings, matches, employer/fraud checks, applications, tailored resumes, cover letters, practice sessions), a weekly digest snapshot, and — once connected — Gmail message metadata + plain-text body (no raw MIME, no attachments), a read-only snapshot of Calendar events, and GitHub repo/skill-evidence metadata. Every risky action taken or proposed is separately recorded in the audit trail (`AuditLog`: what, why, evidence, risk level, decision, result) via `app/audit/`.
 
-**What's specifically protected:** passwords are hashed (never stored or logged in plain text); Gmail/Calendar/GitHub OAuth tokens are Fernet-encrypted at rest (`TOKEN_ENCRYPTION_KEY`) and never returned by any endpoint or written to a log or the audit trail. A real secrets scan (regex-based, against the full git history, not just the working tree) has been run against this repo and found no live credentials.
+**What's specifically protected:** passwords are hashed (never stored or logged in plain text); Gmail/Calendar/GitHub OAuth tokens are Fernet-encrypted at rest (`TOKEN_ENCRYPTION_KEY`) and never returned by any endpoint or written to a log or the audit trail. A secrets scan (gitleaks, across the full git history) found one committed encryption key, in the test setup. It has been replaced with a throwaway test key, but the old value remains in this repository's history, so it must be treated as exposed. No other credentials were found.
 
 **Retention:** nothing expires automatically. Gmail's first sync is bounded to a rolling window (`GMAIL_SYNC_WINDOW_DAYS`, data-minimization by default) rather than the whole mailbox; everything else persists until you remove it.
 
@@ -163,7 +165,7 @@ This is a single-user, self-hosted agent: everything it stores lives in **your o
 - **A citation-marker fabrication is caught; an uncited assertion isn't.** `report.py`'s marker-stripping drops any sentence whose `[claim_id]` doesn't resolve — but if a model asserts a fact with *no* citation marker at all, nothing currently catches that. A separate, harder problem the module doesn't attempt to solve yet.
 - **Retrieval depends on a live embeddings API.** The eval harness's own most recent runs hit a transient Voyage outage; `/search` fails clearly (503) rather than guessing when this happens, but it does mean search has a real external dependency with no offline fallback.
 - **The one-active-practice-session lock is in-process only.** `asyncio.Lock`, not a distributed lock — correct for a single-instance deployment (which this is), would need rework before running as more than one worker.
-- **Calendar event reading and interview/deadline detection** aren't built yet — only the connection itself is.
+- **Calendar has no reminders or notifications, and never writes to your calendar** (read-only by design). Event sync and interview/deadline classification are built; application links are proposals you can correct.
 - **The optional LLM README critique** for the GitHub recruiter-readiness review isn't built.
 
 **v2 backlog** (deliberately out of scope for now): LinkedIn tooling (no authorized API for a personal developer account — see [docs/decisions.md](docs/decisions.md)), Slack/WhatsApp integrations, a voice interface or mobile app, multi-user accounts, fine-tuning a custom model.
