@@ -9,7 +9,7 @@ import { useAuthStore } from '@/stores/auth'
 
 const CONNECTION: CalendarConnection = {
   id: 'c1',
-  google_email: 'aziz@gmail.com',
+  google_email: 'person-01@example.com',
   status: 'connected',
   last_error: null,
   created_at: '2026-09-22T10:00:00Z',
@@ -117,7 +117,7 @@ describe('CalendarPage', () => {
     stubApi({ '/calendar/connection': () => json(CONNECTION) })
     renderAt(<CalendarPage />)
 
-    expect(await screen.findByText('aziz@gmail.com')).toBeInTheDocument()
+    expect(await screen.findByText('person-01@example.com')).toBeInTheDocument()
     expect(screen.getByText('Connected')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Disconnect' })).toBeInTheDocument()
   })

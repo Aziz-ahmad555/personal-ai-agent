@@ -1,5 +1,8 @@
 """Pure function tests for app.career.fraud — no DB, no mocking, each signal isolated."""
 
+import pytest
+
+from app.career import fraud
 from app.career.fraud import HIGH_RISK_THRESHOLD, MEDIUM_RISK_THRESHOLD, assess_fraud_risk
 
 _BASE_KWARGS = {
@@ -80,10 +83,11 @@ def test_company_domain_mismatch_not_checked_for_board_channels() -> None:
     assert "company_domain_mismatch" not in [s.code for s in result.signals]
 
 
-def test_personal_email_for_corporate_contact_is_flagged() -> None:
+def test_personal_email_for_corporate_contact_is_flagged(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(fraud, "_FREE_EMAIL_DOMAINS", frozenset({"example.com"}))
     kwargs = dict(
         _BASE_KWARGS,
-        description_text="Contact our recruiter directly at jobs.acme.hr@gmail.com to apply.",
+        description_text="Contact our recruiter directly at person-09@example.com to apply.",
     )
     result = assess_fraud_risk(**kwargs)
     assert "personal_email_for_corporate_contact" in [s.code for s in result.signals]

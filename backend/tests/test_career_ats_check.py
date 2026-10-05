@@ -183,9 +183,11 @@ def test_missing_skills_or_education_warns_and_odd_headings_are_named() -> None:
 
 
 def test_contact_details_pass_warn_or_fail() -> None:
-    assert _check("a@b.co and +92 300 1234567", "contact").status == "pass"
-    assert _check("reach me at (555) 123-4567 and me@site.dev", "contact").status == "pass"
-    only_email = _check("me@site.dev", "contact")
+    assert _check("person-07@example.com and +92 300 1234567", "contact").status == "pass"
+    assert (
+        _check("reach me at (555) 123-4567 and person-08@example.com", "contact").status == "pass"
+    )
+    only_email = _check("person-08@example.com", "contact")
     assert only_email.status == "warn"
     assert "add a phone number" in only_email.detail
     only_phone = _check("+92 300 1234567", "contact")

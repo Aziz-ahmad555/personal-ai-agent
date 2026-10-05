@@ -26,7 +26,7 @@ async def _connect(
         user = (await db.execute(select(User).where(User.email == email))).scalar_one()
         fields: dict[str, object] = {
             "user_id": user.id,
-            "google_email": "aziz@gmail.com",
+            "google_email": "person-01@example.com",
             "access_token_encrypted": encrypt_token("access-token"),
             "refresh_token_encrypted": encrypt_token("refresh-token"),
             "token_expires_at": datetime.now(UTC) + timedelta(hours=1),
@@ -49,7 +49,7 @@ async def _tracked_application(
             source_channel="manual_paste",
             title="ML Engineer",
             company_name="Acme Corp",
-            company_domain="acme.com",
+            company_domain="example.com",
             description_text="x",
         )
         db.add(job)
@@ -208,14 +208,16 @@ async def test_a_linked_application_is_included(
     user_id = await _connect_and_get_user(session_factory)
     application_id = await _tracked_application(session_factory, user_id)
     fake = FakeCalendar()
-    fake.events_page([event("e1", summary="Interview", attendees=[{"email": "jane@acme.com"}])])
+    fake.events_page(
+        [event("e1", summary="Interview", attendees=[{"email": "person-02@example.com"}])]
+    )
 
     await _sync(client, auth_headers, monkeypatch, fake)
     events = await _events(client, auth_headers)
 
     assert events[0]["application"]["id"] == str(application_id)
     assert events[0]["application"]["company_name"] == "Acme Corp"
-    assert "acme.com" in events[0]["application_match_reason"]
+    assert "example.com" in events[0]["application_match_reason"]
 
 
 async def _connect_and_get_user(session_factory: async_sessionmaker[AsyncSession]) -> uuid.UUID:

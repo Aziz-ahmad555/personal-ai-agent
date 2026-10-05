@@ -38,7 +38,7 @@ async def _insert_connection(
     async with session_factory() as db:
         fields: dict[str, object] = {
             "user_id": user_id,
-            "google_email": "aziz@gmail.com",
+            "google_email": "person-01@example.com",
             "access_token_encrypted": encrypt_token("access"),
             "refresh_token_encrypted": encrypt_token("refresh"),
             "token_expires_at": datetime.now(UTC) + timedelta(hours=1),
@@ -91,7 +91,7 @@ async def test_oauth_callback_creates_connection(
         )
 
     async def fake_get_profile(client_obj: object, access_token: str) -> dict[str, str]:
-        return {"emailAddress": "aziz@gmail.com", "historyId": "1"}
+        return {"emailAddress": "person-01@example.com", "historyId": "1"}
 
     monkeypatch.setattr(router_module, "exchange_code_for_tokens", fake_exchange)
     monkeypatch.setattr(router_module, "get_profile", fake_get_profile)
@@ -107,7 +107,7 @@ async def test_oauth_callback_creates_connection(
 
     connection_response = await client.get("/gmail/connection", headers=auth_headers)
     assert connection_response.status_code == 200
-    assert connection_response.json()["google_email"] == "aziz@gmail.com"
+    assert connection_response.json()["google_email"] == "person-01@example.com"
     assert connection_response.json()["status"] == "connected"
 
 

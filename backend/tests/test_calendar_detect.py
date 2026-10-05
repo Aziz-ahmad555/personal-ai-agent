@@ -51,7 +51,9 @@ def test_a_generic_word_like_due_alone_is_not_a_deadline_keyword() -> None:
 # --- find_application_match: domains -----------------------------------------------------
 
 
-def _candidate(app_id: str = "a1", name: str | None = "Acme Corp", domain: str | None = "acme.com"):
+def _candidate(
+    app_id: str = "a1", name: str | None = "Acme Corp", domain: str | None = "example.com"
+):
     return ApplicationCandidate(app_id, name, domain)
 
 
@@ -59,14 +61,14 @@ def test_an_attendee_email_domain_matches_the_tracked_employer() -> None:
     match = find_application_match(
         summary="Chat",
         description=None,
-        attendees=[{"email": "jane@acme.com"}],
+        attendees=[{"email": "person-02@example.com"}],
         organizer_email=None,
         candidates=[_candidate()],
     )
 
     assert match is not None
     assert match.application_id == "a1"
-    assert "acme.com" in match.reason
+    assert "example.com" in match.reason
 
 
 def test_the_organizer_email_domain_also_counts() -> None:
@@ -74,7 +76,7 @@ def test_the_organizer_email_domain_also_counts() -> None:
         summary="Chat",
         description=None,
         attendees=[],
-        organizer_email="recruiter@acme.com",
+        organizer_email="person-03@example.com",
         candidates=[_candidate()],
     )
 
@@ -85,9 +87,9 @@ def test_an_unrelated_domain_does_not_match() -> None:
     match = find_application_match(
         summary="Chat",
         description=None,
-        attendees=[{"email": "jane@other.com"}],
+        attendees=[{"email": "person-04@example.com"}],
         organizer_email=None,
-        candidates=[_candidate()],
+        candidates=[_candidate(domain="unrelated-company.example")],
     )
 
     assert match is None
@@ -97,7 +99,7 @@ def test_a_candidate_with_no_domain_is_skipped_for_domain_matching() -> None:
     match = find_application_match(
         summary="Chat with Acme Corp",
         description=None,
-        attendees=[{"email": "jane@other.com"}],
+        attendees=[{"email": "person-04@example.com"}],
         organizer_email=None,
         candidates=[_candidate(domain=None)],
     )
@@ -183,12 +185,12 @@ def test_domain_matches_are_preferred_over_name_matches() -> None:
     # Two candidates; only the domain-matching one should win even though both names appear.
     candidates = [
         ApplicationCandidate("wrong", "Acme Corp", "notacme.example"),
-        ApplicationCandidate("right", "Acme Corp", "acme.com"),
+        ApplicationCandidate("right", "Acme Corp", "example.com"),
     ]
     match = find_application_match(
         summary="Interview with Acme Corp",
         description=None,
-        attendees=[{"email": "jane@acme.com"}],
+        attendees=[{"email": "person-02@example.com"}],
         organizer_email=None,
         candidates=candidates,
     )

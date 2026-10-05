@@ -22,7 +22,7 @@ async def _make_connection(
     expires_delta = timedelta(minutes=-5) if expired else timedelta(hours=1)
     connection = GmailConnection(
         user_id=user.id,
-        google_email="aziz@gmail.com",
+        google_email="person-01@example.com",
         access_token_encrypted=encrypt_token("fake-access-token"),
         refresh_token_encrypted=encrypt_token("fake-refresh-token"),
         token_expires_at=datetime.now(UTC) + expires_delta,

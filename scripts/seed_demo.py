@@ -236,7 +236,7 @@ async def _seed_profile(db: AsyncSession, user: User) -> Profile:
 async def _seed_gmail(db: AsyncSession, user: User) -> None:
     connection = GmailConnection(
         user_id=user.id,
-        google_email="alex.rivera.demo@gmail.com",
+        google_email="alex.rivera.demo@personal-ai-agent.example",
         granted_scopes="https://www.googleapis.com/auth/gmail.readonly",
         status="connected",
         last_synced_at=days_ago(1),
@@ -253,7 +253,7 @@ async def _seed_gmail(db: AsyncSession, user: User) -> None:
         ),
         (
             "Re: Interview invitation — Nimbus Data Systems",
-            "alex.rivera.demo@gmail.com",
+            "alex.rivera.demo@personal-ai-agent.example",
             5,
             "Thanks, Tuesday at 2pm works well for me.",
         ),
@@ -355,7 +355,7 @@ async def _seed_gmail(db: AsyncSession, user: User) -> None:
                 thread_id=f"demo-thread-{idx // 2:03d}",
                 subject=subject,
                 from_address=sender,
-                to_addresses=["alex.rivera.demo@gmail.com"],
+                to_addresses=["alex.rivera.demo@personal-ai-agent.example"],
                 date=sent_at,
                 snippet=snippet,
                 body_text=snippet,
@@ -466,7 +466,7 @@ async def _seed_github(db: AsyncSession, user: User) -> None:
 async def _seed_calendar(db: AsyncSession, user: User, application_id: uuid.UUID | None) -> None:
     connection = CalendarConnection(
         user_id=user.id,
-        google_email="alex.rivera.demo@gmail.com",
+        google_email="alex.rivera.demo@personal-ai-agent.example",
         granted_scopes="https://www.googleapis.com/auth/calendar.events.readonly",
         status="connected",
         last_synced_at=days_ago(1),

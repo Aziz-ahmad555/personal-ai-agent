@@ -33,7 +33,7 @@ function renderBanner(ui: ReactElement = <ReauthBanner />) {
 
 const GMAIL_CONNECTED: GmailConnection = {
   id: 'g1',
-  google_email: 'aziz@gmail.com',
+  google_email: 'person-01@example.com',
   status: 'connected',
   last_synced_at: null,
   last_sync_error: null,
@@ -42,7 +42,7 @@ const GMAIL_CONNECTED: GmailConnection = {
 
 const CALENDAR_CONNECTED: CalendarConnection = {
   id: 'c1',
-  google_email: 'aziz@gmail.com',
+  google_email: 'person-01@example.com',
   status: 'connected',
   last_error: null,
   created_at: '2026-09-22T10:00:00Z',

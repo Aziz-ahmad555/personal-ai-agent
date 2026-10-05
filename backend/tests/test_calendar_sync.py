@@ -139,7 +139,7 @@ async def _connection(
             await db.flush()
         fields: dict[str, object] = {
             "user_id": user.id,
-            "google_email": "aziz@gmail.com",
+            "google_email": "person-01@example.com",
             "access_token_encrypted": encrypt_token("access-token"),
             "refresh_token_encrypted": encrypt_token("refresh-token"),
             "token_expires_at": datetime.now(UTC) + timedelta(hours=1),
@@ -158,7 +158,7 @@ async def _tracked_application(
     user_id,  # type: ignore[no-untyped-def]
     *,
     company_name: str = "Acme Corp",
-    company_domain: str | None = "acme.com",
+    company_domain: str | None = "example.com",
 ) -> str:
     async with session_factory() as db:
         job = JobPosting(
@@ -235,7 +235,7 @@ async def test_an_event_is_linked_to_a_tracked_application_by_domain(
             event(
                 "e1",
                 summary="Interview",
-                attendees=[{"email": "jane@acme.com"}],
+                attendees=[{"email": "person-02@example.com"}],
             )
         ]
     )
@@ -244,7 +244,7 @@ async def test_an_event_is_linked_to_a_tracked_application_by_domain(
 
     events = await _events(session_factory)
     assert str(events["e1"].application_id) == application_id
-    assert "acme.com" in (events["e1"].application_match_reason or "")
+    assert "example.com" in (events["e1"].application_match_reason or "")
 
 
 async def test_all_day_events_are_parsed_as_such(

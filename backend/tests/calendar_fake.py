@@ -62,7 +62,7 @@ class FakeCalendar:
 
     # --- canned scenarios ---------------------------------------------------------------
 
-    def primary_calendar(self, email: str = "aziz@gmail.com") -> None:
+    def primary_calendar(self, email: str = "person-01@example.com") -> None:
         self.routes["/calendar/v3/calendars/primary"] = ok({"id": email, "summary": email})
 
     def events_page(

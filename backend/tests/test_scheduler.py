@@ -302,7 +302,7 @@ async def _gmail_connection(
         user = await _make_user(db)
         fields: dict[str, object] = {
             "user_id": user.id,
-            "google_email": "aziz@gmail.com",
+            "google_email": "person-01@example.com",
             "access_token_encrypted": encrypt_token("fake-access-token"),
             "refresh_token_encrypted": encrypt_token("fake-refresh-token"),
             "token_expires_at": datetime.now(UTC) + timedelta(hours=1),
@@ -395,7 +395,7 @@ async def _calendar_connection(
         user = await _make_user(db)
         fields: dict[str, object] = {
             "user_id": user.id,
-            "google_email": "aziz@gmail.com",
+            "google_email": "person-01@example.com",
             "access_token_encrypted": encrypt_token("access-token"),
             "refresh_token_encrypted": encrypt_token("refresh-token"),
             "token_expires_at": datetime.now(UTC) + timedelta(hours=1),

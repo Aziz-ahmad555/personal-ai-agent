@@ -33,7 +33,7 @@ async def _seed_owned_data(
         db.add(
             GmailConnection(
                 user_id=user_id,
-                google_email="aziz@gmail.com",
+                google_email="person-01@example.com",
                 access_token_encrypted=encrypt_token("access"),
                 refresh_token_encrypted=encrypt_token("refresh"),
                 token_expires_at=datetime.now(UTC) + timedelta(hours=1),

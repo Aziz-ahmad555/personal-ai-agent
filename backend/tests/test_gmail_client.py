@@ -197,7 +197,7 @@ def _plain_text_message_payload() -> dict[str, object]:
         "payload": {
             "headers": [
                 {"name": "Subject", "value": "Interview follow-up"},
-                {"name": "From", "value": "recruiter@acme.com"},
+                {"name": "From", "value": "person-03@example.com"},
                 {"name": "To", "value": "aziz@example.com, cc@example.com"},
             ],
             "mimeType": "text/plain",
@@ -211,7 +211,7 @@ def test_parse_message_extracts_plain_text_body() -> None:
     assert message.gmail_message_id == "msg123"
     assert message.thread_id == "thread123"
     assert message.subject == "Interview follow-up"
-    assert message.from_address == "recruiter@acme.com"
+    assert message.from_address == "person-03@example.com"
     assert message.to_addresses == ["aziz@example.com", "cc@example.com"]
     assert message.body_text == "Thanks for chatting today."
     assert message.label_ids == ["INBOX", "UNREAD"]
@@ -265,10 +265,12 @@ def test_parse_message_handles_missing_body_gracefully() -> None:
 
 
 def test_parse_address_list_splits_and_strips() -> None:
-    assert client._parse_address_list("a@x.com, b@y.com,c@z.com") == [
-        "a@x.com",
-        "b@y.com",
-        "c@z.com",
+    assert client._parse_address_list(
+        "person-10@example.com, person-11@example.com,person-12@example.com"
+    ) == [
+        "person-10@example.com",
+        "person-11@example.com",
+        "person-12@example.com",
     ]
     assert client._parse_address_list(None) == []
     assert client._parse_address_list("") == []

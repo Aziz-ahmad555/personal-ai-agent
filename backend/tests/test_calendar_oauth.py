@@ -253,12 +253,12 @@ async def test_get_primary_calendar_sends_a_bearer_token_and_returns_the_account
         seen["method"] = request.method
         seen["path"] = request.url.path
         seen["auth"] = request.headers["authorization"]
-        return _json({"id": "aziz@gmail.com", "summary": "aziz@gmail.com"})
+        return _json({"id": "person-01@example.com", "summary": "person-01@example.com"})
 
     async with _api(handler) as http:
         calendar = await calendar_client.get_primary_calendar(http, "ya29.access")
 
-    assert calendar["id"] == "aziz@gmail.com"
+    assert calendar["id"] == "person-01@example.com"
     assert seen == {
         "method": "GET",
         "path": "/calendar/v3/calendars/primary",
@@ -297,7 +297,7 @@ async def _connection(
             await db.flush()
         fields: dict[str, object] = {
             "user_id": user.id,
-            "google_email": "aziz@gmail.com",
+            "google_email": "person-01@example.com",
             "access_token_encrypted": encrypt_token("access-1"),
             "refresh_token_encrypted": encrypt_token("refresh-1"),
             "token_expires_at": datetime.now(UTC) + timedelta(hours=1),

@@ -37,7 +37,9 @@ def _state(user_id: uuid.UUID) -> str:
     return oauth.build_authorization_url(user_id).split("state=")[1].split("&")[0]
 
 
-def _fake_google(monkeypatch: pytest.MonkeyPatch, *, email: str = "aziz@gmail.com") -> list[str]:
+def _fake_google(
+    monkeypatch: pytest.MonkeyPatch, *, email: str = "person-01@example.com"
+) -> list[str]:
     """Stub the network. Returns the list that records which tokens got revoked."""
     revoked: list[str] = []
 
@@ -115,20 +117,20 @@ async def test_a_successful_callback_connects_stores_encrypted_tokens_and_audits
     assert "ya29.access-token" not in (stored.access_token_encrypted or "")
     assert decrypt_token(stored.access_token_encrypted) == "ya29.access-token"  # type: ignore[arg-type]
     assert decrypt_token(stored.refresh_token_encrypted) == "1//refresh-token"  # type: ignore[arg-type]
-    assert (stored.google_email, stored.status) == ("aziz@gmail.com", "connected")
+    assert (stored.google_email, stored.status) == ("person-01@example.com", "connected")
 
     async with session_factory() as db:
         entry = (
             await db.execute(select(AuditLog).where(AuditLog.action == "calendar.connected"))
         ).scalar_one()
     assert entry.risk_level == "green"
-    assert entry.evidence["google_email"] == "aziz@gmail.com"
+    assert entry.evidence["google_email"] == "person-01@example.com"
     assert "ya29" not in str(entry.evidence) + str(entry.summary)  # no token in the audit
 
     connection = await client.get("/calendar/connection", headers=auth_headers)
     assert connection.status_code == 200
     body = connection.json()
-    assert body["google_email"] == "aziz@gmail.com"
+    assert body["google_email"] == "person-01@example.com"
     assert not {"access_token_encrypted", "refresh_token_encrypted"} & set(body)
     assert "ya29" not in connection.text
 
@@ -185,9 +187,9 @@ async def test_reconnecting_updates_the_same_row_and_records_the_account_change(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     user_id = await _user_id(session_factory)
-    _fake_google(monkeypatch, email="first@gmail.com")
+    _fake_google(monkeypatch, email="person-05@example.com")
     await _callback(client, user_id)
-    _fake_google(monkeypatch, email="second@gmail.com")
+    _fake_google(monkeypatch, email="person-06@example.com")
 
     await _callback(client, user_id)
 
@@ -198,8 +200,11 @@ async def test_reconnecting_updates_the_same_row_and_records_the_account_change(
             .scalars()
             .all()
         )
-    assert [row.google_email for row in rows] == ["second@gmail.com"]
-    assert [entry.evidence["previous_email"] for entry in connected] == [None, "first@gmail.com"]
+    assert [row.google_email for row in rows] == ["person-06@example.com"]
+    assert [entry.evidence["previous_email"] for entry in connected] == [
+        None,
+        "person-05@example.com",
+    ]
 
 
 # --- disconnect -----------------------------------------------------------------------------
