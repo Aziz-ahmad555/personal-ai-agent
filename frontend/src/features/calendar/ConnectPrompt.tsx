@@ -50,8 +50,8 @@ export function ConnectPrompt({ reconnect = false }: { reconnect?: boolean }) {
             </div>
             <p>You can disconnect at any time. That revokes the token on Google and clears it here.</p>
             <p className="rounded-md bg-muted p-3">
-              <span className="font-medium text-foreground">Not built yet:</span> the interview
-              practice mode (generated questions and scored feedback).
+              <span className="font-medium text-foreground">Interview practice</span> lives in Career,
+              per job: generated questions, a verdict for each answer, and written feedback.
             </p>
           </div>
         </div>

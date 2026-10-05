@@ -104,12 +104,13 @@ describe('CalendarPage', () => {
     expect(screen.getAllByText(/primary calendar/).length).toBeGreaterThan(0)
   })
 
-  it('says plainly that only the interview practice mode is not built yet', async () => {
+  it('points to interview practice in Career rather than calling it unbuilt', async () => {
     stubApi({ '/calendar/connection': () => json({ detail: 'Not found' }, 404) })
     renderAt(<CalendarPage />)
 
-    expect(await screen.findByText('Not built yet:')).toBeInTheDocument()
-    expect(screen.getByText(/the interview\s*practice mode/)).toBeInTheDocument()
+    expect(await screen.findByText('Interview practice')).toBeInTheDocument()
+    expect(screen.getByText(/lives in Career/)).toBeInTheDocument()
+    expect(screen.queryByText('Not built yet:')).not.toBeInTheDocument()
     expect(screen.getByText(/look like interviews or application deadlines/)).toBeInTheDocument()
   })
 
