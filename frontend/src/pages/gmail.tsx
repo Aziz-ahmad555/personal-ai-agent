@@ -75,7 +75,9 @@ export function GmailPage() {
 
       {!isLoading && !isError && connection === null && <ConnectPrompt />}
 
-      {!isLoading && !isError && connection && (
+      {!isLoading && !isError && connection?.status === 'disconnected' && <ConnectPrompt reconnect />}
+
+      {!isLoading && !isError && connection && connection.status !== 'disconnected' && (
         <>
           <ConnectionCard connection={connection} />
           <SyncHistoryList />

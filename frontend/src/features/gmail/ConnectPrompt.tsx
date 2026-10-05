@@ -5,13 +5,14 @@ import { ErrorState } from '@/components/layout/error-state'
 import { useStartOAuth } from '@/features/gmail/hooks'
 import { isDemoMode } from '@/lib/demo'
 
-export function ConnectPrompt() {
+export function ConnectPrompt({ reconnect = false }: { reconnect?: boolean }) {
   const startOAuth = useStartOAuth()
+  const label = reconnect ? 'Reconnect Gmail (read-only)' : 'Connect Gmail (read-only)'
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Connect Gmail</CardTitle>
+        <CardTitle>{reconnect ? 'Reconnect Gmail' : 'Connect Gmail'}</CardTitle>
         <CardDescription>Read-only, and only what's described below — nothing else.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -45,7 +46,7 @@ export function ConnectPrompt() {
 
         <Button onClick={() => startOAuth.mutate()} disabled={startOAuth.isPending || isDemoMode}>
           <Mail className="h-4 w-4" />
-          {startOAuth.isPending ? 'Redirecting…' : 'Connect Gmail (read-only)'}
+          {startOAuth.isPending ? 'Redirecting…' : label}
         </Button>
         {isDemoMode && (
           <p className="text-sm text-muted-foreground">

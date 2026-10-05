@@ -59,7 +59,7 @@ export function ConnectionCard({ connection }: { connection: GithubConnection })
         )}
 
         <div className="flex flex-wrap gap-2">
-          {needsReauth && (
+          {connection.status !== 'connected' && (
             <Button onClick={() => start.mutate()} disabled={start.isPending}>
               {start.isPending ? 'Redirecting…' : 'Reconnect'}
             </Button>

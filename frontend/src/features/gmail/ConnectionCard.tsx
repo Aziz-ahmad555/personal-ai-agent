@@ -53,8 +53,8 @@ export function ConnectionCard({ connection }: { connection: GmailConnection }) 
         )}
 
         <div className="flex flex-wrap gap-2">
-          {needsReauth ? (
-            <Button onClick={() => startOAuth.mutate()} disabled={startOAuth.isPending}>
+          {connection.status !== 'connected' ? (
+            <Button onClick={() => startOAuth.mutate()} disabled={startOAuth.isPending || isDemoMode}>
               {startOAuth.isPending ? 'Redirecting…' : 'Reconnect'}
             </Button>
           ) : (
