@@ -463,3 +463,47 @@ async def test_other_users_digests_are_invisible_and_delete_is_audited(
     async with session_factory() as db:
         actions = set((await db.execute(select(AuditLog.action))).scalars().all())
     assert {"reporting.digest.generated", "reporting.digest.deleted"} <= actions
+
+
+async def test_digest_skips_calendar_events_without_a_start_time(
+    client: AsyncClient,
+    auth_headers: dict[str, str],
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """start_at is nullable on CalendarEvent. An event with no start time has nowhere to sit in
+    the lookahead window, so the digest must leave it out rather than fail to order it."""
+    user_id = await _owner_id(session_factory)
+    now = datetime.now(UTC)
+
+    async with session_factory() as db:
+        connection = CalendarConnection(
+            user_id=user_id, google_email="me@example.com", granted_scopes="x", status="connected"
+        )
+        db.add(connection)
+        await db.flush()
+        db.add_all(
+            [
+                CalendarEvent(
+                    connection_id=connection.id,
+                    google_event_id="undated",
+                    summary="Undated interview",
+                    kind="interview",
+                    start_at=None,
+                    is_all_day=False,
+                ),
+                CalendarEvent(
+                    connection_id=connection.id,
+                    google_event_id="dated",
+                    summary="Dated interview",
+                    kind="interview",
+                    start_at=now + timedelta(days=2),
+                    is_all_day=False,
+                ),
+            ]
+        )
+        await db.commit()
+
+    digest = await _generate(client, auth_headers, lookahead_days=14)
+    calendar = digest["data"]["calendar"]
+
+    assert [e["summary"] for e in calendar["upcoming_interviews"]] == ["Dated interview"]

@@ -423,14 +423,17 @@ async def _calendar_section(
             )
         )
     ).all()
-    rows = sorted(
-        (row for row in all_rows if _in_range(row[0].start_at, now, lookahead_end)),
-        key=lambda row: row[0].start_at,
-    )
+    # Events with no start time can't be placed in a window, so they're left out here rather
+    # than sorted; narrowing the time before sorting is what keeps the key non-optional.
+    dated: list[tuple[datetime, CalendarEvent, JobPosting | None]] = []
+    for event, job in all_rows:
+        if event.start_at is not None and _in_range(event.start_at, now, lookahead_end):
+            dated.append((event.start_at, event, job))
+    dated.sort(key=lambda item: item[0])
 
     interviews: list[dict[str, Any]] = []
     deadlines: list[dict[str, Any]] = []
-    for event, job in rows:
+    for _, event, job in dated:
         entry = {
             "summary": event.summary,
             "start_at": event.start_at.isoformat() if event.start_at else None,

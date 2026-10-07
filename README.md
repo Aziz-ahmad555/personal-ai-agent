@@ -189,7 +189,7 @@ that deployment is configured.
 git clone https://github.com/Aziz-ahmad555/personal-ai-agent.git && cd personal-ai-agent
 cp .env.example .env               # fill in real secrets — see Setup below for which ones you need
 docker compose up -d               # Postgres (pgvector) + Redis
-cd backend && pip install -e ".[dev]" && alembic upgrade head && uvicorn app.main:app --reload
+cd backend && pip install -e ".[dev]" -c constraints-dev.txt && alembic upgrade head && uvicorn app.main:app --reload
 ```
 
 Then, in a second terminal:
@@ -233,7 +233,7 @@ docker compose ps   # confirm both containers are healthy
 cd backend
 python -m venv .venv
 ./.venv/Scripts/activate        # Windows
-pip install -e ".[dev]"
+pip install -e ".[dev]" -c constraints-dev.txt
 cp ../.env.example ../.env      # then fill in real secrets
 alembic upgrade head
 uvicorn app.main:app --reload
