@@ -25,7 +25,7 @@ backend/
     core/         Rate limiting, health checks, the background scheduler
     db/           SQLAlchemy Base, async session factory
   alembic/        Migrations — a fresh clone builds the schema from nothing (verified)
-  tests/          814 tests; tests/conftest.py is the shared test infrastructure
+  tests/          815 tests; tests/conftest.py is the shared test infrastructure
 frontend/
   src/
     features/     One folder per domain (profile, research, career, gmail, github, calendar,

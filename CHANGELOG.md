@@ -34,9 +34,9 @@ Measured from the eval harness (`evals/run_all.py`). Methodology and full breakd
 | LLM-judge calibration | **14/14 (100%)** | The judge's faithful/relevant verdicts agree with hand-assigned human labels on every gold-set example |
 | Judge-scored faithfulness/relevance | **15/15** | Scenario grid: faithful+relevant, unfaithful, irrelevant, hedged, contradicted-by-a-second-source, etc. |
 | Baseline comparison | 3/3 | See note below — this one doesn't show what you'd expect |
-| Backend test suite | **814 passed** | Full suite, `pytest --cov=app` |
+| Backend test suite | **815 passed** | Full suite, `pytest --cov=app` |
 | Frontend test suite | **240 passed** | `vitest run` |
-| Backend coverage | **84%** | 9,183 statements, 1,509 missed — measured 2026-10-05 |
+| Backend coverage | **84%** | 9,187 statements, 1,509 missed — measured 2026-10-07 |
 
 Cost of a full `--live` eval run: an estimated **$0.0041**, about 26 seconds.
 

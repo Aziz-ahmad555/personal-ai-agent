@@ -270,6 +270,10 @@ async def test_a_run_past_the_time_cap_fails_with_a_clear_retry_message(
 ) -> None:
     monkeypatch.setattr(pipeline_module, "QUERY_TIMEOUT", timedelta(milliseconds=100))
     monkeypatch.setattr(pipeline_module, "get_search_provider", lambda: _SlowSearchProvider())
+    # get_llm_provider() is called eagerly, before the timeout wrapper, and raises if no real
+    # provider key is configured — this test never reaches the LLM step (it times out during
+    # search), so a fake provider with no payloads queued is enough to keep it key-independent.
+    monkeypatch.setattr(pipeline_module, "get_llm_provider", lambda settings: _FakeLLMProvider([]))
 
     create = await client.post(
         "/research/queries", headers=auth_headers, json={"query_text": "Slow question"}

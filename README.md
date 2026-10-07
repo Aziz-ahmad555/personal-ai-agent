@@ -44,9 +44,9 @@ Measured, not assumed — from the eval harness (`evals/run_all.py`; methodology
 | LLM-judge calibration | **14/14 (100%)** | The judge's faithful/relevant verdicts agree with hand-assigned human labels on every gold-set example |
 | Judge-scored faithfulness/relevance | **15/15** | Scenario grid: faithful+relevant, unfaithful, irrelevant, hedged, contradicted-by-a-second-source, etc. |
 | Baseline comparison | 3/3 | See note below — this one doesn't show what you'd expect |
-| Backend test suite | **814 passed** | Full suite, `pytest --cov=app` |
+| Backend test suite | **815 passed** | Full suite, `pytest --cov=app` |
 | Frontend test suite | **240 passed** | `vitest run` |
-| Backend coverage | **84%** | 9,183 statements, 1,509 missed — measured 2026-10-05 |
+| Backend coverage | **84%** | 9,187 statements, 1,509 missed — measured 2026-10-07 |
 
 **Honest note on the baseline comparison:** this check sends the same source text to a raw model with no retrieval/citation pipeline, to see whether it fabricates specifics the source never stated (a salary figure, a hiring manager's name, a team size). In the runs recorded so far, the raw model didn't fabricate on these particular narrow, omission-type questions either — so this specific comparison is a **regression canary**, not proof the verification pipeline is dramatically outperforming a plain LLM call. The pipeline's real value shows up in the adversarial and hallucination-precision numbers above, where the *source text itself* contains the injected/fabricated claim — that's the case a citation-verified quote check alone can't catch, and where the pipeline's deterministic verifiers (not the model) are what actually holds the line.
 
